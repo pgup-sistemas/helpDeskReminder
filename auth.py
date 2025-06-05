@@ -1,37 +1,22 @@
 from functools import wraps
-from flask import jsonify, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import jsonify, request, redirect, url_for
+from flask_login import login_required, current_user
 from models import User, UserRole
 
 def role_required(*allowed_roles):
     def decorator(f):
         @wraps(f)
-        @jwt_required()
+        @login_required
         def decorated_function(*args, **kwargs):
-            current_user_id = get_jwt_identity()
-            user = User.query.get(current_user_id)
-            
-            if not user or not user.is_active:
+            if not current_user.is_authenticated or not current_user.is_active:
                 return jsonify({'message': 'User not found or inactive'}), 401
-            
-            if user.role not in allowed_roles:
+
+            if current_user.role not in allowed_roles:
                 return jsonify({'message': 'Insufficient permissions'}), 403
-            
-            return f(current_user=user, *args, **kwargs)
+
+            return f(*args, **kwargs)
         return decorated_function
     return decorator
-
-def get_current_user():
-    """Get current user from JWT token"""
-    try:
-        current_user_id = get_jwt_identity()
-        if current_user_id:
-            user = User.query.get(current_user_id)
-            if user and user.is_active:
-                return user
-    except Exception as e:
-        print(f"JWT Error: {e}")
-    return None
 
 def can_access_ticket(user, ticket):
     """Check if user can access a specific ticket"""

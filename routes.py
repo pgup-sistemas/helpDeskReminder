@@ -1,83 +1,100 @@
+
 import os
 import csv
 from datetime import datetime
-from flask import render_template, request, jsonify, send_file, redirect, url_for, session
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask import render_template, request, jsonify, send_file, redirect, url_for, session, flash
+from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 from io import StringIO, BytesIO
 
 from app import app, db, socketio
 from models import User, Ticket, ChatMessage, TicketAttachment, UserRole, TicketStatus, TicketPriority
-from auth import role_required, get_current_user, can_access_ticket, can_modify_ticket
+from auth import role_required, can_access_ticket, can_modify_ticket
 from utils import allowed_file, get_dashboard_stats
 
 # Frontend routes
 @app.route('/')
 def index():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
     return render_template('login.html')
 
-@app.route('/dashboard')
-def dashboard():
-    return render_template('dashboard.html')
+@app.route('/login')
+def login_page():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    return render_template('login.html')
 
-@app.route('/tickets')
-def tickets():
-    return render_template('tickets.html')
-
-@app.route('/ticket/<int:ticket_id>')
-def ticket_detail(ticket_id):
-    return render_template('ticket_detail.html', ticket_id=ticket_id)
-
-@app.route('/users')
-def users():
-    return render_template('users.html')
-
-@app.route('/reports')
-def reports():
-    return render_template('reports.html')
-
-# API routes
-@app.route('/api/login', methods=['POST'])
+@app.route('/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    username = request.form.get('username')
+    password = request.form.get('password')
     
     if not username or not password:
-        return jsonify({'message': 'Username and password required'}), 400
+        flash('Username e senha são obrigatórios', 'error')
+        return redirect(url_for('login_page'))
     
     user = User.query.filter_by(username=username).first()
     
     if user and user.check_password(password) and user.is_active:
-        access_token = create_access_token(identity=user.id)
-        return jsonify({
-            'access_token': access_token,
-            'user': user.to_dict()
-        })
+        login_user(user, remember=True)
+        next_page = request.args.get('next')
+        return redirect(next_page) if next_page else redirect(url_for('dashboard'))
     
-    return jsonify({'message': 'Invalid credentials'}), 401
+    flash('Credenciais inválidas', 'error')
+    return redirect(url_for('login_page'))
 
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('Logout realizado com sucesso', 'success')
+    return redirect(url_for('login_page'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    return render_template('dashboard.html')
+
+@app.route('/tickets')
+@login_required
+def tickets():
+    return render_template('tickets.html')
+
+@app.route('/ticket/<int:ticket_id>')
+@login_required
+def ticket_detail(ticket_id):
+    ticket = Ticket.query.get_or_404(ticket_id)
+    if not can_access_ticket(current_user, ticket):
+        flash('Acesso negado', 'error')
+        return redirect(url_for('tickets'))
+    return render_template('ticket_detail.html', ticket_id=ticket_id)
+
+@app.route('/users')
+@role_required(UserRole.ADMINISTRADOR)
+def users():
+    return render_template('users.html')
+
+@app.route('/reports')
+@role_required(UserRole.ADMINISTRADOR, UserRole.DIRETORIA)
+def reports():
+    return render_template('reports.html')
+
+# API routes
 @app.route('/api/me', methods=['GET'])
-@jwt_required()
+@login_required
 def get_current_user_info():
-    current_user = get_current_user()
-    if current_user:
-        return jsonify(current_user.to_dict())
-    return jsonify({'message': 'User not found'}), 404
+    return jsonify(current_user.to_dict())
 
 @app.route('/api/dashboard/stats', methods=['GET'])
 @role_required(UserRole.ADMINISTRADOR, UserRole.DIRETORIA, UserRole.TECNICO)
-def dashboard_stats(current_user):
+def dashboard_stats():
     stats = get_dashboard_stats()
     return jsonify(stats)
 
 @app.route('/api/tickets', methods=['GET'])
-@jwt_required()
+@login_required
 def get_tickets():
-    current_user = get_current_user()
-    if not current_user:
-        return jsonify({'message': 'User not found'}), 404
-    
     query = Ticket.query
     
     # Filter based on user role
@@ -108,12 +125,8 @@ def get_tickets():
     return jsonify([ticket.to_dict() for ticket in tickets])
 
 @app.route('/api/tickets', methods=['POST'])
-@jwt_required()
+@login_required
 def create_ticket():
-    current_user = get_current_user()
-    if not current_user:
-        return jsonify({'message': 'User not found'}), 404
-    
     data = request.get_json()
     
     required_fields = ['title', 'description', 'department', 'priority']
@@ -146,12 +159,8 @@ def create_ticket():
     return jsonify(ticket.to_dict()), 201
 
 @app.route('/api/tickets/<int:ticket_id>', methods=['GET'])
-@jwt_required()
+@login_required
 def get_ticket(ticket_id):
-    current_user = get_current_user()
-    if not current_user:
-        return jsonify({'message': 'User not found'}), 404
-    
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if not can_access_ticket(current_user, ticket):
@@ -161,12 +170,8 @@ def get_ticket(ticket_id):
     return jsonify(ticket.to_dict())
 
 @app.route('/api/tickets/<int:ticket_id>', methods=['PUT'])
-@jwt_required()
+@login_required
 def update_ticket(ticket_id):
-    current_user = get_current_user()
-    if not current_user:
-        return jsonify({'message': 'User not found'}), 404
-    
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if not can_modify_ticket(current_user, ticket):
@@ -224,12 +229,8 @@ def update_ticket(ticket_id):
     return jsonify(ticket.to_dict())
 
 @app.route('/api/tickets/<int:ticket_id>/messages', methods=['GET'])
-@jwt_required()
+@login_required
 def get_ticket_messages(ticket_id):
-    current_user = get_current_user()
-    if not current_user:
-        return jsonify({'message': 'User not found'}), 404
-    
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if not can_access_ticket(current_user, ticket):
@@ -239,12 +240,8 @@ def get_ticket_messages(ticket_id):
     return jsonify([message.to_dict() for message in messages])
 
 @app.route('/api/tickets/<int:ticket_id>/messages', methods=['POST'])
-@jwt_required()
+@login_required
 def create_message(ticket_id):
-    current_user = get_current_user()
-    if not current_user:
-        return jsonify({'message': 'User not found'}), 404
-    
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if not can_access_ticket(current_user, ticket):
@@ -271,12 +268,8 @@ def create_message(ticket_id):
     return jsonify(message.to_dict()), 201
 
 @app.route('/api/tickets/<int:ticket_id>/attachments', methods=['POST'])
-@jwt_required()
+@login_required
 def upload_attachment(ticket_id):
-    current_user = get_current_user()
-    if not current_user:
-        return jsonify({'message': 'User not found'}), 404
-    
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if not can_access_ticket(current_user, ticket):
@@ -330,12 +323,8 @@ def upload_attachment(ticket_id):
     return jsonify(attachment.to_dict()), 201
 
 @app.route('/api/tickets/<int:ticket_id>/attachments', methods=['GET'])
-@jwt_required()
+@login_required
 def get_attachments(ticket_id):
-    current_user = get_current_user()
-    if not current_user:
-        return jsonify({'message': 'User not found'}), 404
-    
     ticket = Ticket.query.get_or_404(ticket_id)
     
     if not can_access_ticket(current_user, ticket):
@@ -345,12 +334,8 @@ def get_attachments(ticket_id):
     return jsonify([attachment.to_dict() for attachment in attachments])
 
 @app.route('/api/attachments/<int:attachment_id>/download', methods=['GET'])
-@jwt_required()
+@login_required
 def download_attachment(attachment_id):
-    current_user = get_current_user()
-    if not current_user:
-        return jsonify({'message': 'User not found'}), 404
-    
     attachment = TicketAttachment.query.get_or_404(attachment_id)
     
     if not can_access_ticket(current_user, attachment.ticket):
@@ -365,13 +350,13 @@ def download_attachment(attachment_id):
 
 @app.route('/api/users', methods=['GET'])
 @role_required(UserRole.ADMINISTRADOR)
-def get_users(current_user):
+def get_users():
     users = User.query.all()
     return jsonify([user.to_dict() for user in users])
 
 @app.route('/api/users', methods=['POST'])
 @role_required(UserRole.ADMINISTRADOR)
-def create_user(current_user):
+def create_user():
     data = request.get_json()
     
     required_fields = ['username', 'email', 'password', 'role']
@@ -401,7 +386,7 @@ def create_user(current_user):
 
 @app.route('/api/users/<int:user_id>', methods=['PUT'])
 @role_required(UserRole.ADMINISTRADOR)
-def update_user(current_user, user_id):
+def update_user(user_id):
     user = User.query.get_or_404(user_id)
     data = request.get_json()
     
@@ -434,14 +419,14 @@ def update_user(current_user, user_id):
     return jsonify(user.to_dict())
 
 @app.route('/api/technicians', methods=['GET'])
-@jwt_required()
+@login_required
 def get_technicians():
     technicians = User.query.filter_by(role=UserRole.TECNICO, is_active=True).all()
     return jsonify([{'id': tech.id, 'username': tech.username} for tech in technicians])
 
 @app.route('/api/reports/export', methods=['GET'])
 @role_required(UserRole.ADMINISTRADOR, UserRole.DIRETORIA)
-def export_tickets(current_user):
+def export_tickets():
     # Get filter parameters
     status = request.args.get('status')
     priority = request.args.get('priority')

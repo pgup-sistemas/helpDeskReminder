@@ -1,3 +1,4 @@
+
 import os
 import logging
 from flask import Flask, jsonify
@@ -5,6 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
 from flask_cors import CORS
+from flask_login import LoginManager
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -17,6 +19,7 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 jwt = JWTManager()
 socketio = SocketIO(cors_allowed_origins="*")
+login_manager = LoginManager()
 
 # Create the app
 app = Flask(__name__)
@@ -29,6 +32,12 @@ CORS(app)
 # Configure JWT
 app.config['JWT_SECRET_KEY'] = os.environ.get("JWT_SECRET_KEY", "jwt-secret-string")
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False
+
+# Configure Flask-Login
+login_manager.init_app(app)
+login_manager.login_view = 'login_page'
+login_manager.login_message = 'Por favor, faça login para acessar esta página.'
+login_manager.login_message_category = 'info'
 
 # Configure the database
 database_url = os.environ.get("DATABASE_URL")
@@ -49,6 +58,11 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 db.init_app(app)
 jwt.init_app(app)
 socketio.init_app(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    from models import User
+    return User.query.get(int(user_id))
 
 # JWT error handlers
 @jwt.expired_token_loader

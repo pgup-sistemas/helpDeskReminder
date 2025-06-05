@@ -1,28 +1,8 @@
-from app import db
-from datetime import datetime, timedelta
-from werkzeug.security import generate_password_hash, check_password_hash
-from enum import Enum
-
-class UserRole(Enum):
-    COLABORADOR = "colaborador"
-    TECNICO = "tecnico"
-    ADMINISTRADOR = "administrador"
-    DIRETORIA = "diretoria"
-
-class TicketStatus(Enum):
-    ABERTO = "aberto"
-    EM_ANDAMENTO = "em_andamento"
-    RESOLVIDO = "resolvido"
-    FECHADO = "fechado"
-
-class TicketPriority(Enum):
-    ALTA = "alta"
-    MEDIA = "media"
-    BAIXA = "baixa"
 
 import enum
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin
 from app import db
 
 class UserRole(enum.Enum):
@@ -44,7 +24,7 @@ class TicketPriority(enum.Enum):
     ALTA = 'alta'
     CRITICA = 'critica'
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
