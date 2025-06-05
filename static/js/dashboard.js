@@ -484,3 +484,169 @@ async function loadCriticalTickets() {
         }
     }
 }
+
+// Dashboard initialization
+async function initDashboard() {
+    // Ensure user is authenticated
+    if (!isAuthenticated()) {
+        window.location.href = '/';
+        return;
+    }
+
+    // Load current user info
+    await loadCurrentUser();
+
+    // Load dashboard data
+    await loadDashboardStats();
+    await loadRecentTickets();
+
+    // Set up event listeners
+    setupDashboardEventListeners();
+}
+
+// Load current user information
+async function loadCurrentUser() {
+    try {
+        const user = await getCurrentUser();
+        if (user) {
+            updateUserInfo(user);
+        }
+    } catch (error) {
+        console.error('Failed to load user:', error);
+    }
+}
+
+// Update user info in the UI
+function updateUserInfo(user) {
+    const userNameElement = document.getElementById('userName');
+    const userRoleElement = document.getElementById('userRole');
+
+    if (userNameElement) {
+        userNameElement.textContent = user.username;
+    }
+
+    if (userRoleElement) {
+        userRoleElement.textContent = user.role;
+    }
+}
+
+// Load dashboard statistics
+async function loadDashboardStats() {
+    try {
+        const response = await axios.get('/api/dashboard/stats');
+        const stats = response.data;
+
+        updateDashboardStats(stats);
+    } catch (error) {
+        console.error('Failed to load dashboard stats:', error);
+        // Don't show error for stats, just log it
+    }
+}
+
+// Update dashboard statistics in the UI
+function updateDashboardStats(stats) {
+    const elements = {
+        'totalTickets': stats.total_tickets || 0,
+        'openTickets': stats.open_tickets || 0,
+        'inProgressTickets': stats.in_progress_tickets || 0,
+        'resolvedTickets': stats.resolved_tickets || 0,
+        'criticalTickets': stats.critical_tickets || 0,
+        'avgResolutionTime': stats.avg_resolution_time || 'N/A'
+    };
+
+    Object.entries(elements).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+        }
+    });
+}
+
+// Load recent tickets
+async function loadRecentTickets() {
+    try {
+        const response = await axios.get('/api/tickets?limit=5');
+        const tickets = response.data;
+
+        updateRecentTickets(tickets.slice(0, 5));
+    } catch (error) {
+        console.error('Failed to load recent tickets:', error);
+    }
+}
+
+// Update recent tickets in the UI
+function updateRecentTickets(tickets) {
+    const container = document.getElementById('recentTickets');
+    if (!container) return;
+
+    if (tickets.length === 0) {
+        container.innerHTML = '<p class="text-gray-500">No recent tickets found.</p>';
+        return;
+    }
+
+    container.innerHTML = tickets.map(ticket => `
+        <div class="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer" onclick="navigateTo('/ticket/${ticket.id}')">
+            <div class="flex justify-between items-start mb-2">
+                <h4 class="font-medium text-gray-900">#${ticket.id} - ${ticket.title}</h4>
+                <span class="px-2 py-1 text-xs rounded-full ${getPriorityColor(ticket.priority)}">
+                    ${formatPriority(ticket.priority)}
+                </span>
+            </div>
+            <p class="text-sm text-gray-600 mb-2">${ticket.description.substring(0, 100)}${ticket.description.length > 100 ? '...' : ''}</p>
+            <div class="flex justify-between items-center text-xs text-gray-500">
+                <span>Status: <span class="px-2 py-1 rounded-full ${getStatusColor(ticket.status)}">${formatStatus(ticket.status)}</span></span>
+                <span>${formatDate(ticket.created_at)}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Set up event listeners for dashboard
+function setupDashboardEventListeners() {
+    // Quick action buttons
+    const newTicketBtn = document.getElementById('newTicketBtn');
+    if (newTicketBtn) {
+        newTicketBtn.addEventListener('click', () => {
+            navigateTo('/tickets?action=new');
+        });
+    }
+
+    const viewAllTicketsBtn = document.getElementById('viewAllTicketsBtn');
+    if (viewAllTicketsBtn) {
+        viewAllTicketsBtn.addEventListener('click', () => {
+            navigateTo('/tickets');
+        });
+    }
+
+    const reportsBtn = document.getElementById('reportsBtn');
+    if (reportsBtn) {
+        reportsBtn.addEventListener('click', () => {
+            navigateTo('/reports');
+        });
+    }
+
+    // Logout button
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logout();
+        });
+    }
+
+    // Refresh button
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            location.reload();
+        });
+    }
+}
+
+// Auto-refresh dashboard data every 30 seconds
+setInterval(() => {
+    if (window.location.pathname === '/dashboard' && isAuthenticated()) {
+        loadDashboardStats();
+        loadRecentTickets();
+    }
+}, 30000);

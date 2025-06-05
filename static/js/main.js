@@ -1,436 +1,426 @@
+// Global state
+let currentUser = null;
+let authToken = localStorage.getItem('authToken');
 
-// Global application state and utilities
-class HelpDeskApp {
-    constructor() {
-        this.token = localStorage.getItem('access_token');
-        this.user = null;
-        this.socket = null;
-        this.init();
-    }
+// Configure axios defaults
+if (authToken) {
+    axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+}
 
-    async init() {
-        // Set up axios defaults
-        axios.defaults.baseURL = window.location.origin;
-        axios.defaults.headers.common['Content-Type'] = 'application/json';
-
-        // Add token to all requests
-        if (this.token) {
-            axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
-            await this.loadCurrentUser();
-        }
-
-        // Initialize Socket.IO if user is authenticated
-        if (this.user) {
-            this.initSocket();
-        }
-
-        // Initialize page-specific functionality
-        this.initPage();
-        this.setupEventListeners();
-    }
-
-    async loadCurrentUser() {
-        try {
-            const response = await axios.get('/api/me');
-            this.user = response.data;
-            this.updateUI();
-        } catch (error) {
-            console.error('Failed to load user:', error);
-            this.logout();
-        }
-    }
-
-    initSocket() {
-        this.socket = io({
-            auth: {
-                token: this.token
+// Add axios interceptor to handle 401 errors
+axios.interceptors.response.use(
+    response => response,
+    error => {
+        if (error.response && error.response.status === 401) {
+            // Token expired or invalid, redirect to login
+            localStorage.removeItem('authToken');
+            delete axios.defaults.headers.common['Authorization'];
+            if (window.location.pathname !== '/') {
+                window.location.href = '/';
             }
+        }
+        return Promise.reject(error);
+    }
+);
+
+// Authentication functions
+function setAuthToken(token) {
+    authToken = token;
+    localStorage.setItem('authToken', token);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+}
+
+function clearAuthToken() {
+    authToken = null;
+    localStorage.removeItem('authToken');
+    delete axios.defaults.headers.common['Authorization'];
+}
+
+function isAuthenticated() {
+    return !!authToken;
+}
+
+// Login function
+async function login(username, password) {
+    try {
+        const response = await axios.post('/api/login', {
+            username: username,
+            password: password
         });
 
-        this.socket.on('connected', (data) => {
-            console.log('Socket connected:', data);
-        });
-
-        this.socket.on('error', (data) => {
-            console.error('Socket error:', data);
-        });
-    }
-
-    initPage() {
-        const path = window.location.pathname;
-
-        if (path === '/' || path === '/login') {
-            this.initLoginPage();
-        } else if (path === '/dashboard') {
-            this.initDashboard();
-        } else if (path === '/tickets') {
-            this.initTicketsPage();
-        } else if (path.startsWith('/ticket/')) {
-            this.initTicketDetailPage();
-        } else if (path === '/users') {
-            this.initUsersPage();
-        } else if (path === '/reports') {
-            this.initReportsPage();
+        if (response.data.access_token) {
+            setAuthToken(response.data.access_token);
+            currentUser = response.data.user;
+            return { success: true, user: response.data.user };
         }
-    }
-
-    setupEventListeners() {
-        // Global event listeners
-        document.addEventListener('click', (e) => {
-            if (e.target.matches('[data-action="logout"]')) {
-                e.preventDefault();
-                this.logout();
-            }
-        });
-
-        // Modal handling
-        document.addEventListener('click', (e) => {
-            if (e.target.matches('.modal-overlay')) {
-                this.closeModal();
-            }
-            if (e.target.matches('[data-dismiss="modal"]')) {
-                this.closeModal();
-            }
-        });
-    }
-
-    // Authentication methods
-    async login(username, password) {
-        try {
-            const response = await axios.post('/api/login', {
-                username,
-                password
-            });
-
-            this.token = response.data.access_token;
-            this.user = response.data.user;
-
-            localStorage.setItem('access_token', this.token);
-            axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
-
-            this.initSocket();
-            window.location.href = '/dashboard';
-
-        } catch (error) {
-            throw new Error(error.response?.data?.message || 'Login failed');
-        }
-    }
-
-    logout() {
-        localStorage.removeItem('access_token');
-        delete axios.defaults.headers.common['Authorization'];
-
-        if (this.socket) {
-            this.socket.disconnect();
-        }
-
-        window.location.href = '/';
-    }
-
-    // UI utilities
-    updateUI() {
-        if (!this.user) return;
-
-        // Update user info in navigation
-        const userElement = document.querySelector('[data-user-info]');
-        if (userElement) {
-            userElement.textContent = this.user.username;
-        }
-
-        const roleElement = document.querySelector('[data-user-role]');
-        if (roleElement) {
-            roleElement.textContent = this.getRoleDisplayName(this.user.role);
-        }
-
-        // Show/hide elements based on role
-        this.updateRoleBasedUI();
-    }
-
-    updateRoleBasedUI() {
-        const userRole = this.user?.role;
-
-        // Hide admin-only elements
-        document.querySelectorAll('[data-role-required]').forEach(el => {
-            const requiredRoles = el.dataset.roleRequired.split(',');
-            if (!requiredRoles.includes(userRole)) {
-                el.style.display = 'none';
-            }
-        });
-    }
-
-    getRoleDisplayName(role) {
-        const roleNames = {
-            'colaborador': 'Colaborador',
-            'tecnico': 'Técnico',
-            'administrador': 'Administrador',
-            'diretoria': 'Diretoria'
-        };
-        return roleNames[role] || role;
-    }
-
-    // Modal utilities
-    showModal(content, title = '') {
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        modal.innerHTML = `
-            <div class="modal-content">
-                ${title ? `<div class="modal-header"><h3 class="text-lg font-semibold">${title}</h3></div>` : ''}
-                <div class="modal-body">${content}</div>
-                <div class="modal-footer">
-                    <button type="button" class="btn-secondary" data-dismiss="modal">Fechar</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        modal.classList.add('fade-in');
-    }
-
-    closeModal() {
-        const modal = document.querySelector('.modal-overlay');
-        if (modal) {
-            modal.remove();
-        }
-    }
-
-    // Alert utilities
-    showAlert(message, type = 'info') {
-        const alert = document.createElement('div');
-        alert.className = `alert alert-${type} fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg`;
-
-        const bgColors = {
-            success: 'bg-green-100 text-green-800 border border-green-200',
-            error: 'bg-red-100 text-red-800 border border-red-200',
-            warning: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
-            info: 'bg-blue-100 text-blue-800 border border-blue-200'
-        };
-
-        alert.className += ' ' + bgColors[type];
-        alert.innerHTML = `
-            <div class="flex items-center">
-                <span>${message}</span>
-                <button type="button" class="ml-4 text-current opacity-70 hover:opacity-100" onclick="this.parentElement.parentElement.remove()">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                    </svg>
-                </button>
-            </div>
-        `;
-
-        document.body.appendChild(alert);
-
-        // Auto remove after 5 seconds
-        setTimeout(() => {
-            if (alert.parentElement) {
-                alert.remove();
-            }
-        }, 5000);
-    }
-
-    // Loading utilities
-    showLoading(element) {
-        const loading = document.createElement('div');
-        loading.className = 'loading-overlay absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center';
-        loading.innerHTML = '<div class="loading-spinner"></div>';
-        element.style.position = 'relative';
-        element.appendChild(loading);
-    }
-
-    hideLoading(element) {
-        const loading = element.querySelector('.loading-overlay');
-        if (loading) {
-            loading.remove();
-        }
-    }
-
-    // Utility methods
-    formatDate(dateString) {
-        return new Date(dateString).toLocaleString('pt-BR');
-    }
-
-    formatRelativeTime(dateString) {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffDays = Math.floor(diffHours / 24);
-
-        if (diffHours < 1) {
-            return 'Agora há pouco';
-        } else if (diffHours < 24) {
-            return `${diffHours}h atrás`;
-        } else {
-            return `${diffDays}d atrás`;
-        }
-    }
-
-    formatSLATime(seconds) {
-        if (seconds <= 0) return 'Vencido';
-
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-
-        if (hours > 0) {
-            return `${hours}h ${minutes}m restantes`;
-        } else {
-            return `${minutes}m restantes`;
-        }
-    }
-
-    getSLAAlertClass(timeRemaining) {
-        if (timeRemaining <= 0) return 'sla-critical';
-        if (timeRemaining <= 3600) return 'sla-warning'; // 1 hour
-        return 'sla-normal';
-    }
-
-    // Page-specific initialization methods
-    initLoginPage() {
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-
-                const username = document.getElementById('username').value;
-                const password = document.getElementById('password').value;
-                const submitBtn = loginForm.querySelector('button[type="submit"]');
-
-                try {
-                    submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<div class="loading-spinner mr-2"></div>Entrando...';
-
-                    await this.login(username, password);
-                } catch (error) {
-                    this.showAlert(error.message, 'error');
-                } finally {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = 'Entrar';
-                }
-            });
-        }
-    }
-
-    initDashboard() {
-        this.loadDashboardStats();
-        this.loadRecentTickets();
-
-        // Auto refresh every 30 seconds
-        setInterval(() => {
-            this.loadDashboardStats();
-        }, 30000);
-    }
-
-    async loadDashboardStats() {
-        try {
-            const response = await axios.get('/api/dashboard/stats');
-            const stats = response.data;
-
-            // Update stat cards
-            this.updateStatCard('total-tickets', stats.total_tickets);
-            this.updateStatCard('open-tickets', stats.open_tickets);
-            this.updateStatCard('in-progress-tickets', stats.in_progress_tickets);
-            this.updateStatCard('resolved-tickets', stats.resolved_tickets);
-            this.updateStatCard('sla-violations', stats.sla_violated);
-
-            // Update charts if they exist
-            if (window.dashboardCharts) {
-                window.dashboardCharts.updateCharts(stats);
-            }
-
-        } catch (error) {
-            console.error('Failed to load dashboard stats:', error);
-        }
-    }
-
-    updateStatCard(cardId, value) {
-        const element = document.querySelector(`[data-stat="${cardId}"]`);
-        if (element) {
-            element.textContent = value;
-        }
-    }
-
-    async loadRecentTickets() {
-        try {
-            const response = await axios.get('/api/tickets?limit=5');
-            const tickets = response.data.slice(0, 5);
-
-            const container = document.getElementById('recent-tickets');
-            if (container) {
-                container.innerHTML = tickets.map(ticket => `
-                    <div class="flex items-center justify-between p-3 border-b border-gray-200 last:border-b-0">
-                        <div class="flex-1">
-                            <h4 class="font-medium text-sm">${ticket.title}</h4>
-                            <p class="text-xs text-gray-500">${this.formatRelativeTime(ticket.created_at)}</p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <span class="priority-${ticket.priority}">${ticket.priority}</span>
-                            <span class="status-${ticket.status}">${ticket.status.replace('_', ' ')}</span>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        } catch (error) {
-            console.error('Failed to load recent tickets:', error);
-        }
-    }
-
-    initTicketsPage() {
-        this.loadTickets();
-        this.setupTicketFilters();
-        this.setupNewTicketForm();
-    }
-
-    initTicketDetailPage() {
-        const ticketId = window.location.pathname.split('/').pop();
-        this.loadTicketDetail(ticketId);
-        this.initChat(ticketId);
-    }
-
-    initUsersPage() {
-        if (this.user && this.user.role === 'administrador') {
-            this.loadUsers();
-            this.setupUserManagement();
-        }
-    }
-
-    initReportsPage() {
-        if (this.user && ['administrador', 'diretoria'].includes(this.user.role)) {
-            this.setupReportsPage();
-        }
-    }
-
-    // Additional methods for consistency
-    async loadTickets() {
-        // Implementation placeholder
-    }
-
-    setupTicketFilters() {
-        // Implementation placeholder
-    }
-
-    setupNewTicketForm() {
-        // Implementation placeholder
-    }
-
-    loadTicketDetail(ticketId) {
-        // Implementation placeholder
-    }
-
-    initChat(ticketId) {
-        // Implementation placeholder
-    }
-
-    loadUsers() {
-        // Implementation placeholder
-    }
-
-    setupUserManagement() {
-        // Implementation placeholder
-    }
-
-    setupReportsPage() {
-        // Implementation placeholder
+    } catch (error) {
+        console.error('Login error:', error);
+        return { success: false, message: error.response?.data?.message || 'Login failed' };
     }
 }
 
-// Initialize the application
-const app = new HelpDeskApp();
-window.helpDeskApp = app;
+// Get current user info
+async function getCurrentUser() {
+    if (!isAuthenticated()) {
+        return null;
+    }
+
+    try {
+        const response = await axios.get('/api/me');
+        currentUser = response.data;
+        return response.data;
+    } catch (error) {
+        console.error('Failed to get current user:', error);
+        return null;
+    }
+}
+
+// Logout function
+function logout() {
+    clearAuthToken();
+    currentUser = null;
+    window.location.href = '/';
+}
+
+// Check if user is authenticated and redirect if needed
+async function checkAuth() {
+    if (!isAuthenticated()) {
+        if (window.location.pathname !== '/') {
+            window.location.href = '/';
+        }
+        return false;
+    }
+
+    // Verify token is still valid
+    const user = await getCurrentUser();
+    if (!user) {
+        if (window.location.pathname !== '/') {
+            window.location.href = '/';
+        }
+        return false;
+    }
+
+    return true;
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async function() {
+    // If on login page and already authenticated, redirect to dashboard
+    if (window.location.pathname === '/' && isAuthenticated()) {
+        const user = await getCurrentUser();
+        if (user) {
+            window.location.href = '/dashboard';
+            return;
+        }
+    }
+
+    // If not on login page, check authentication
+    if (window.location.pathname !== '/') {
+        const authenticated = await checkAuth();
+        if (!authenticated) {
+            return;
+        }
+    }
+
+    // Initialize page-specific functionality
+    const path = window.location.pathname;
+
+    if (path === '/') {
+        initLoginPage();
+    } else if (path === '/dashboard') {
+        initDashboard();
+    } else if (path === '/tickets') {
+        initTicketsPage();
+    } else if (path.startsWith('/ticket/')) {
+        const ticketId = path.split('/')[2];
+        initTicketDetailPage(ticketId);
+    } else if (path === '/users') {
+        initUsersPage();
+    } else if (path === '/reports') {
+        initReportsPage();
+    }
+});
+
+// Login page initialization
+function initLoginPage() {
+    const loginForm = document.getElementById('loginForm');
+    const errorDiv = document.getElementById('error-message');
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                showError('Please enter both username and password');
+                return;
+            }
+
+            const submitButton = document.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Logging in...';
+
+            const result = await login(username, password);
+
+            if (result.success) {
+                window.location.href = '/dashboard';
+            } else {
+                showError(result.message || 'Login failed');
+                submitButton.disabled = false;
+                submitButton.textContent = 'Login';
+            }
+        });
+    }
+
+    function showError(message) {
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+    }
+}
+
+// Utility functions
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+}
+
+function formatPriority(priority) {
+    const priorities = {
+        'baixa': 'Low',
+        'media': 'Medium',
+        'alta': 'High',
+        'critica': 'Critical'
+    };
+    return priorities[priority] || priority;
+}
+
+function formatStatus(status) {
+    const statuses = {
+        'aberto': 'Open',
+        'em_andamento': 'In Progress',
+        'aguardando': 'Waiting',
+        'resolvido': 'Resolved',
+        'fechado': 'Closed'
+    };
+    return statuses[status] || status;
+}
+
+function getPriorityColor(priority) {
+    const colors = {
+        'baixa': 'bg-green-100 text-green-800',
+        'media': 'bg-yellow-100 text-yellow-800',
+        'alta': 'bg-orange-100 text-orange-800',
+        'critica': 'bg-red-100 text-red-800'
+    };
+    return colors[priority] || 'bg-gray-100 text-gray-800';
+}
+
+function getStatusColor(status) {
+    const colors = {
+        'aberto': 'bg-blue-100 text-blue-800',
+        'em_andamento': 'bg-yellow-100 text-yellow-800',
+        'aguardando': 'bg-purple-100 text-purple-800',
+        'resolvido': 'bg-green-100 text-green-800',
+        'fechado': 'bg-gray-100 text-gray-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+}
+
+// Navigation
+function navigateTo(path) {
+    window.location.href = path;
+}
+
+// Error handling
+function handleError(error, context = '') {
+    console.error(`Error ${context}:`, error);
+
+    let message = 'An error occurred';
+    if (error.response) {
+        message = error.response.data?.message || `HTTP ${error.response.status}`;
+    } else if (error.message) {
+        message = error.message;
+    }
+
+    // Show error to user (you can customize this)
+    alert(`Error: ${message}`);
+}
+```
+
+// Dashboard page initialization
+function initDashboard() {
+    // Load dashboard stats
+    loadDashboardStats();
+
+    // Load recent tickets
+    loadRecentTickets();
+}
+
+// Load dashboard stats
+async function loadDashboardStats() {
+    try {
+        const response = await axios.get('/api/dashboard/stats');
+        const stats = response.data;
+
+        // Update stat cards
+        updateStatCard('total-tickets', stats.total_tickets);
+        updateStatCard('open-tickets', stats.open_tickets);
+        updateStatCard('in-progress-tickets', stats.in_progress_tickets);
+        updateStatCard('resolved-tickets', stats.resolved_tickets);
+        updateStatCard('sla-violations', stats.sla_violated);
+
+    } catch (error) {
+        handleError(error, 'loading dashboard stats');
+    }
+}
+
+// Update stat card
+function updateStatCard(cardId, value) {
+    const element = document.querySelector(`[data-stat="${cardId}"]`);
+    if (element) {
+        element.textContent = value;
+    }
+}
+
+// Load recent tickets
+async function loadRecentTickets() {
+    try {
+        const response = await axios.get('/api/tickets?limit=5');
+        const tickets = response.data;
+
+        const container = document.getElementById('recent-tickets');
+        if (container) {
+            container.innerHTML = tickets.map(ticket => `
+                <div class="flex items-center justify-between p-3 border-b border-gray-200 last:border-b-0">
+                    <div class="flex-1">
+                        <h4 class="font-medium text-sm">${ticket.title}</h4>
+                        <p class="text-xs text-gray-500">${formatDate(ticket.created_at)}</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="${getPriorityColor(ticket.priority)} px-2 py-1 rounded text-xs font-medium">${formatPriority(ticket.priority)}</span>
+                        <span class="${getStatusColor(ticket.status)} px-2 py-1 rounded text-xs font-medium">${formatStatus(ticket.status)}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        handleError(error, 'loading recent tickets');
+    }
+}
+
+// Tickets page initialization
+function initTicketsPage() {
+    // Load tickets
+    loadTickets();
+}
+
+// Load tickets
+async function loadTickets() {
+    try {
+        const response = await axios.get('/api/tickets');
+        const tickets = response.data;
+
+        const container = document.getElementById('tickets-container');
+        if (container) {
+            container.innerHTML = tickets.map(ticket => `
+                <div class="flex items-center justify-between p-3 border-b border-gray-200 last:border-b-0">
+                    <div class="flex-1">
+                        <h4 class="font-medium text-sm">${ticket.title}</h4>
+                        <p class="text-xs text-gray-500">${formatDate(ticket.created_at)}</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="${getPriorityColor(ticket.priority)} px-2 py-1 rounded text-xs font-medium">${formatPriority(ticket.priority)}</span>
+                        <span class="${getStatusColor(ticket.status)} px-2 py-1 rounded text-xs font-medium">${formatStatus(ticket.status)}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        handleError(error, 'loading tickets');
+    }
+}
+
+// Ticket detail page initialization
+async function initTicketDetailPage(ticketId) {
+    // Load ticket details
+    loadTicketDetails(ticketId);
+}
+
+// Load ticket details
+async function loadTicketDetails(ticketId) {
+    try {
+        const response = await axios.get(`/api/ticket/${ticketId}`);
+        const ticket = response.data;
+
+        const container = document.getElementById('ticket-details');
+        if (container) {
+            container.innerHTML = `
+                <h2 class="text-2xl font-semibold mb-4">${ticket.title}</h2>
+                <p class="text-gray-600 mb-2"><strong>Priority:</strong> <span class="${getPriorityColor(ticket.priority)} px-2 py-1 rounded text-xs font-medium">${formatPriority(ticket.priority)}</span></p>
+                <p class="text-gray-600 mb-2"><strong>Status:</strong> <span class="${getStatusColor(ticket.status)} px-2 py-1 rounded text-xs font-medium">${formatStatus(ticket.status)}</span></p>
+                <p class="text-gray-600 mb-2"><strong>Created At:</strong> ${formatDate(ticket.created_at)}</p>
+                <p class="text-gray-700">${ticket.description}</p>
+            `;
+        }
+    } catch (error) {
+        handleError(error, 'loading ticket details');
+    }
+}
+
+// Users page initialization
+function initUsersPage() {
+    // Load users
+    loadUsers();
+}
+
+// Load users
+async function loadUsers() {
+    try {
+        const response = await axios.get('/api/users');
+        const users = response.data;
+
+        const container = document.getElementById('users-container');
+        if (container) {
+            container.innerHTML = users.map(user => `
+                <div class="flex items-center justify-between p-3 border-b border-gray-200 last:border-b-0">
+                    <div class="flex-1">
+                        <h4 class="font-medium text-sm">${user.username}</h4>
+                        <p class="text-xs text-gray-500">${user.email}</p>
+                    </div>
+                    <div>
+                        <span class="px-2 py-1 rounded text-xs font-medium">${user.role}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        handleError(error, 'loading users');
+    }
+}
+
+// Reports page initialization
+function initReportsPage() {
+    // Load reports
+    loadReports();
+}
+
+// Load reports
+async function loadReports() {
+    try {
+        const response = await axios.get('/api/reports');
+        const reports = response.data;
+
+        const container = document.getElementById('reports-container');
+        if (container) {
+            container.innerHTML = `
+                <pre>${JSON.stringify(reports, null, 2)}</pre>
+            `;
+        }
+    } catch (error) {
+        handleError(error, 'loading reports');
+    }
+}

@@ -20,6 +20,30 @@ class TicketPriority(Enum):
     MEDIA = "media"
     BAIXA = "baixa"
 
+import enum
+from datetime import datetime, timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
+from app import db
+
+class UserRole(enum.Enum):
+    ADMINISTRADOR = 'administrador'
+    DIRETORIA = 'diretoria'
+    TECNICO = 'tecnico'
+    COLABORADOR = 'colaborador'
+
+class TicketStatus(enum.Enum):
+    ABERTO = 'aberto'
+    EM_ANDAMENTO = 'em_andamento'
+    AGUARDANDO = 'aguardando'
+    RESOLVIDO = 'resolvido'
+    FECHADO = 'fechado'
+
+class TicketPriority(enum.Enum):
+    BAIXA = 'baixa'
+    MEDIA = 'media'
+    ALTA = 'alta'
+    CRITICA = 'critica'
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
