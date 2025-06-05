@@ -10,7 +10,7 @@ class HelpDeskApp {
     async init() {
         // Set up axios defaults
         axios.defaults.baseURL = window.location.origin;
-        
+
         // Add token to all requests
         if (this.token) {
             axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
@@ -56,7 +56,7 @@ class HelpDeskApp {
 
     initPage() {
         const path = window.location.pathname;
-        
+
         if (path === '/' || path === '/login') {
             this.initLoginPage();
         } else if (path === '/dashboard') {
@@ -102,13 +102,13 @@ class HelpDeskApp {
 
             this.token = response.data.access_token;
             this.user = response.data.user;
-            
+
             localStorage.setItem('token', this.token);
             axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
-            
+
             this.initSocket();
             window.location.href = '/dashboard';
-            
+
         } catch (error) {
             throw new Error(error.response?.data?.message || 'Login failed');
         }
@@ -117,11 +117,11 @@ class HelpDeskApp {
     logout() {
         localStorage.removeItem('token');
         delete axios.defaults.headers.common['Authorization'];
-        
+
         if (this.socket) {
             this.socket.disconnect();
         }
-        
+
         window.location.href = '/';
     }
 
@@ -146,7 +146,7 @@ class HelpDeskApp {
 
     updateRoleBasedUI() {
         const userRole = this.user?.role;
-        
+
         // Hide admin-only elements
         document.querySelectorAll('[data-role-required]').forEach(el => {
             const requiredRoles = el.dataset.roleRequired.split(',');
@@ -194,14 +194,14 @@ class HelpDeskApp {
     showAlert(message, type = 'info') {
         const alert = document.createElement('div');
         alert.className = `alert alert-${type} fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg`;
-        
+
         const bgColors = {
             success: 'bg-green-100 text-green-800 border border-green-200',
             error: 'bg-red-100 text-red-800 border border-red-200',
             warning: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
             info: 'bg-blue-100 text-blue-800 border border-blue-200'
         };
-        
+
         alert.className += ' ' + bgColors[type];
         alert.innerHTML = `
             <div class="flex items-center">
@@ -213,9 +213,9 @@ class HelpDeskApp {
                 </button>
             </div>
         `;
-        
+
         document.body.appendChild(alert);
-        
+
         // Auto remove after 5 seconds
         setTimeout(() => {
             if (alert.parentElement) {
@@ -263,10 +263,10 @@ class HelpDeskApp {
 
     formatSLATime(seconds) {
         if (seconds <= 0) return 'Vencido';
-        
+
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
-        
+
         if (hours > 0) {
             return `${hours}h ${minutes}m restantes`;
         } else {
@@ -286,15 +286,15 @@ class HelpDeskApp {
         if (loginForm) {
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
+
                 const username = document.getElementById('username').value;
                 const password = document.getElementById('password').value;
                 const submitBtn = loginForm.querySelector('button[type="submit"]');
-                
+
                 try {
                     submitBtn.disabled = true;
                     submitBtn.innerHTML = '<div class="loading-spinner mr-2"></div>Entrando...';
-                    
+
                     await this.login(username, password);
                 } catch (error) {
                     this.showAlert(error.message, 'error');
@@ -309,7 +309,7 @@ class HelpDeskApp {
     initDashboard() {
         this.loadDashboardStats();
         this.loadRecentTickets();
-        
+
         // Auto refresh every 30 seconds
         setInterval(() => {
             this.loadDashboardStats();
@@ -320,19 +320,19 @@ class HelpDeskApp {
         try {
             const response = await axios.get('/api/dashboard/stats');
             const stats = response.data;
-            
+
             // Update stat cards
             this.updateStatCard('total-tickets', stats.total_tickets);
             this.updateStatCard('open-tickets', stats.open_tickets);
             this.updateStatCard('in-progress-tickets', stats.in_progress_tickets);
             this.updateStatCard('resolved-tickets', stats.resolved_tickets);
             this.updateStatCard('sla-violations', stats.sla_violated);
-            
+
             // Update charts if they exist
             if (window.dashboardCharts) {
                 window.dashboardCharts.updateCharts(stats);
             }
-            
+
         } catch (error) {
             console.error('Failed to load dashboard stats:', error);
         }
@@ -349,7 +349,7 @@ class HelpDeskApp {
         try {
             const response = await axios.get('/api/tickets?limit=5');
             const tickets = response.data.slice(0, 5);
-            
+
             const container = document.getElementById('recent-tickets');
             if (container) {
                 container.innerHTML = tickets.map(ticket => `
@@ -405,6 +405,51 @@ class HelpDeskApp {
     }
 
     // ... other methods
+}
+
+// Global axios configuration
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+
+// Set authorization header when token is available
+function setAuthToken(token) {
+    if (token) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+        delete axios.defaults.headers.common['Authorization'];
+    }
+}
+
+// Initialize auth token from localStorage
+const token = localStorage.getItem('access_token');
+if (token) {
+    setAuthToken(token);
+}
+
+async function login(username, password) {
+    try {
+        const response = await axios.post('/api/login', {
+            username,
+            password
+        });
+
+        if (response.data.access_token) {
+            localStorage.setItem('access_token', response.data.access_token);
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+            setAuthToken(response.data.access_token);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Login error:', error);
+        throw error;
+    }
+}
+
+function logout() {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    setAuthToken(null);
+    window.location.href = '/';
 }
 
 // Initialize the application

@@ -178,7 +178,7 @@ class DashboardCharts {
             // This would require a new API endpoint for historical data
             const response = await axios.get('/api/dashboard/trend');
             const trendData = response.data;
-            
+
             if (this.charts.trend) {
                 this.charts.trend.data.datasets[0].data = trendData.opened;
                 this.charts.trend.data.datasets[1].data = trendData.resolved;
@@ -206,12 +206,25 @@ class PerformanceMetrics {
 
     async loadMetrics() {
         try {
-            const response = await axios.get('/api/dashboard/stats');
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                logout();
+                return;
+            }
+
+            const response = await axios.get('/api/dashboard/stats', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             const stats = response.data;
-            
+
             this.updateMetrics(stats);
         } catch (error) {
             console.error('Failed to load performance metrics:', error);
+            if (error.response && (error.response.status === 401 || error.response.status === 422)) {
+                logout();
+            }
         }
     }
 
@@ -237,12 +250,12 @@ class PerformanceMetrics {
         const element = document.querySelector(`[data-metric="${metricId}"]`);
         if (element) {
             element.textContent = value;
-            
+
             // Update alert level styling
             const card = element.closest('.stat-card');
             if (card) {
                 card.classList.remove('border-green-200', 'border-yellow-200', 'border-red-200');
-                
+
                 switch (alertLevel) {
                     case 'good':
                         card.classList.add('border-green-200');
@@ -287,10 +300,23 @@ class SLAMonitor {
 
     async loadCriticalTickets() {
         try {
-            const response = await axios.get('/api/tickets?sla_critical=true&limit=5');
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                logout();
+                return;
+            }
+
+            const response = await axios.get('/api/tickets?sla_critical=true&limit=5', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             this.renderCriticalTickets(response.data);
         } catch (error) {
             console.error('Failed to load critical tickets:', error);
+            if (error.response && (error.response.status === 401 || error.response.status === 422)) {
+                logout();
+            }
         }
     }
 
@@ -313,7 +339,7 @@ class SLAMonitor {
         container.innerHTML = tickets.map(ticket => {
             const timeRemaining = ticket.time_until_sla;
             const alertClass = window.helpDeskApp.getSLAAlertClass(timeRemaining);
-            
+
             return `
                 <div class="sla-alert ${alertClass} mb-3">
                     <div class="flex items-start justify-between">
@@ -345,3 +371,116 @@ document.addEventListener('DOMContentLoaded', function() {
         window.slaMonitor = new SLAMonitor();
     }
 });
+
+// Load user info
+async function loadUserInfo() {
+    try {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            logout();
+            return;
+        }
+
+        const response = await axios.get('/api/me', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        const user = response.data;
+
+        document.getElementById('user-name').textContent = user.username;
+        document.getElementById('user-role').textContent = user.role;
+        document.getElementById('user-department').textContent = user.department || 'N/A';
+    } catch (error) {
+        console.error('Failed to load user:', error);
+        if (error.response && (error.response.status === 401 || error.response.status === 422)) {
+            logout();
+        }
+    }
+}
+
+// Load dashboard stats
+async function loadDashboardStats() {
+    try {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            logout();
+            return;
+        }
+
+        const response = await axios.get('/api/dashboard/stats', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        const stats = response.data;
+
+        updateStatsCards(stats);
+    } catch (error) {
+        console.error('Failed to load performance metrics:', error);
+        if (error.response && (error.response.status === 401 || error.response.status === 422)) {
+            logout();
+        }
+    }
+}
+
+// Load critical tickets
+async function loadCriticalTickets() {
+    try {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            logout();
+            return;
+        }
+
+        const response = await axios.get('/api/tickets?sla_critical=true&limit=5', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+         const tickets = response.data;
+        const container = document.getElementById('sla-critical-tickets');
+        if (!container) return;
+
+        if (tickets.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-green-600 py-4">
+                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-sm font-medium">Todos os SLAs em dia!</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = tickets.map(ticket => {
+            const timeRemaining = ticket.time_until_sla;
+            const alertClass = window.helpDeskApp.getSLAAlertClass(timeRemaining);
+
+            return `
+                <div class="sla-alert ${alertClass} mb-3">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <h4 class="font-medium text-sm">${ticket.title}</h4>
+                            <p class="text-xs opacity-75">
+                                ${ticket.requester} • ${ticket.department}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <span class="priority-${ticket.priority} text-xs">${ticket.priority}</span>
+                            <p class="text-xs font-medium mt-1">
+                                ${window.helpDeskApp.formatSLATime(timeRemaining)}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Failed to load critical tickets:', error);
+        if (error.response && (error.response.status === 401 || error.response.status === 422)) {
+            logout();
+        }
+    }
+}

@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask
+from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
@@ -49,6 +49,19 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 db.init_app(app)
 jwt.init_app(app)
 socketio.init_app(app)
+
+# JWT error handlers
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    return jsonify({'message': 'Token has expired'}), 401
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    return jsonify({'message': 'Invalid token'}), 422
+
+@jwt.unauthorized_loader
+def missing_token_callback(error):
+    return jsonify({'message': 'Authorization token is required'}), 401
 
 # Import routes and socket handlers
 from routes import *

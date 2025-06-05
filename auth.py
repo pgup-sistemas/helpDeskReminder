@@ -26,9 +26,11 @@ def get_current_user():
     try:
         current_user_id = get_jwt_identity()
         if current_user_id:
-            return User.query.get(current_user_id)
-    except:
-        pass
+            user = User.query.get(current_user_id)
+            if user and user.is_active:
+                return user
+    except Exception as e:
+        print(f"JWT Error: {e}")
     return None
 
 def can_access_ticket(user, ticket):
