@@ -1,7 +1,8 @@
+
 // Global application state and utilities
 class HelpDeskApp {
     constructor() {
-        this.token = localStorage.getItem('token');
+        this.token = localStorage.getItem('access_token');
         this.user = null;
         this.socket = null;
         this.init();
@@ -10,6 +11,7 @@ class HelpDeskApp {
     async init() {
         // Set up axios defaults
         axios.defaults.baseURL = window.location.origin;
+        axios.defaults.headers.common['Content-Type'] = 'application/json';
 
         // Add token to all requests
         if (this.token) {
@@ -103,7 +105,7 @@ class HelpDeskApp {
             this.token = response.data.access_token;
             this.user = response.data.user;
 
-            localStorage.setItem('token', this.token);
+            localStorage.setItem('access_token', this.token);
             axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
 
             this.initSocket();
@@ -115,7 +117,7 @@ class HelpDeskApp {
     }
 
     logout() {
-        localStorage.removeItem('token');
+        localStorage.removeItem('access_token');
         delete axios.defaults.headers.common['Authorization'];
 
         if (this.socket) {
@@ -395,61 +397,38 @@ class HelpDeskApp {
         }
     }
 
-    // Additional methods will be implemented in separate files for modularity
+    // Additional methods for consistency
     async loadTickets() {
-        // Implementation in tickets-specific code
+        // Implementation placeholder
     }
 
     setupTicketFilters() {
-        // Implementation in tickets-specific code
+        // Implementation placeholder
     }
 
-    // ... other methods
-}
-
-// Global axios configuration
-axios.defaults.headers.common['Content-Type'] = 'application/json';
-
-// Set authorization header when token is available
-function setAuthToken(token) {
-    if (token) {
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-        delete axios.defaults.headers.common['Authorization'];
+    setupNewTicketForm() {
+        // Implementation placeholder
     }
-}
 
-// Initialize auth token from localStorage
-const token = localStorage.getItem('access_token');
-if (token) {
-    setAuthToken(token);
-}
-
-async function login(username, password) {
-    try {
-        const response = await axios.post('/api/login', {
-            username,
-            password
-        });
-
-        if (response.data.access_token) {
-            localStorage.setItem('access_token', response.data.access_token);
-            localStorage.setItem('user', JSON.stringify(response.data.user));
-            setAuthToken(response.data.access_token);
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.error('Login error:', error);
-        throw error;
+    loadTicketDetail(ticketId) {
+        // Implementation placeholder
     }
-}
 
-function logout() {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
-    setAuthToken(null);
-    window.location.href = '/';
+    initChat(ticketId) {
+        // Implementation placeholder
+    }
+
+    loadUsers() {
+        // Implementation placeholder
+    }
+
+    setupUserManagement() {
+        // Implementation placeholder
+    }
+
+    setupReportsPage() {
+        // Implementation placeholder
+    }
 }
 
 // Initialize the application

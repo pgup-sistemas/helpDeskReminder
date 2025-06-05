@@ -81,15 +81,11 @@
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-600">Técnico:</span>
-                    <span class="font-mono">tecnico1 / tecnico123</span>
+                    <span class="font-mono">tecnico / tecnico123</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-600">Colaborador:</span>
-                    <span class="font-mono">colaborador1 / colab123</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Diretoria:</span>
-                    <span class="font-mono">diretor / diretor123</span>
+                    <span class="font-mono">colaborador / colaborador123</span>
                 </div>
             </div>
         </div>
@@ -107,7 +103,7 @@
 {% block scripts %}
 <script>
     // Check if user is already logged in
-    if (localStorage.getItem('token')) {
+    if (localStorage.getItem('access_token')) {
         window.location.href = '/dashboard';
     }
 </script>

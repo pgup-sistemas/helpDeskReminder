@@ -53,9 +53,6 @@ def create_demo_users():
     except Exception as e:
         db.session.rollback()
         print(f"Error creating demo users: {e}")
-
-def create_demo_users():
-    """Create demo users if they don't exist"""
     demo_users = [
         {
             'username': 'admin',
