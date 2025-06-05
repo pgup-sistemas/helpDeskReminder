@@ -1,0 +1,630 @@
+{% extends "base.html" %}
+
+{% block title %}Relatórios - Sistema de Chamados TI{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Relatórios e Analytics</h1>
+            <p class="text-gray-600">Análise detalhada de performance e indicadores</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button id="export-tickets-btn" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
+                <i data-feather="download" class="w-4 h-4 mr-2"></i>
+                Exportar CSV
+            </button>
+            <button id="refresh-data-btn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
+                <i data-feather="refresh-cw" class="w-4 h-4 mr-2"></i>
+                Atualizar
+            </button>
+        </div>
+    </div>
+    
+    <!-- Date Filter -->
+    <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label for="start-date" class="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
+                <input type="date" id="start-date" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="end-date" class="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
+                <input type="date" id="end-date" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="department-filter" class="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+                <select id="department-filter" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                    <option value="">Todos</option>
+                    <option value="TI">TI</option>
+                    <option value="RH">RH</option>
+                    <option value="Financeiro">Financeiro</option>
+                    <option value="Comercial">Comercial</option>
+                    <option value="Operações">Operações</option>
+                    <option value="Administração">Administração</option>
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button id="apply-filters" class="w-full px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-secondary-600 hover:bg-secondary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500 transition-colors duration-200">
+                    Aplicar Filtros
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Key Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <i data-feather="list" class="w-5 h-5 text-blue-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <div class="text-sm font-medium text-gray-500">Total de Chamados</div>
+                        <div id="metric-total" class="text-2xl font-bold text-gray-900">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <i data-feather="check-circle" class="w-5 h-5 text-green-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <div class="text-sm font-medium text-gray-500">Taxa de Resolução</div>
+                        <div id="metric-resolution-rate" class="text-2xl font-bold text-gray-900">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                            <i data-feather="clock" class="w-5 h-5 text-yellow-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <div class="text-sm font-medium text-gray-500">Tempo Médio Resolução</div>
+                        <div id="metric-avg-time" class="text-2xl font-bold text-gray-900">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
+            <div class="p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                            <i data-feather="alert-triangle" class="w-5 h-5 text-red-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <div class="text-sm font-medium text-gray-500">SLA Compliance</div>
+                        <div id="metric-sla-compliance" class="text-2xl font-bold text-gray-900">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Tickets by Status Over Time -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Chamados por Status - Tendência</h3>
+            <div class="h-80">
+                <canvas id="statusTrendChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Tickets by Department -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Chamados por Departamento</h3>
+            <div class="h-80">
+                <canvas id="departmentChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Priority Distribution -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Distribuição por Prioridade</h3>
+            <div class="h-80">
+                <canvas id="priorityDistributionChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Technician Performance -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Performance dos Técnicos</h3>
+            <div class="h-80">
+                <canvas id="technicianPerformanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detailed Tables -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- SLA Violations -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">Violações de SLA</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chamado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridade</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tempo Excedido</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sla-violations-table" class="bg-white divide-y divide-gray-200">
+                        <!-- SLA violations will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Top Issues -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">Principais Problemas</h3>
+            </div>
+            <div class="p-6">
+                <div id="top-issues-list" class="space-y-4">
+                    <!-- Top issues will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let charts = {};
+let currentFilters = {};
+
+// Initialize date filters with current month
+function initializeDateFilters() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    document.getElementById('start-date').value = firstDay.toISOString().split('T')[0];
+    document.getElementById('end-date').value = lastDay.toISOString().split('T')[0];
+}
+
+// Load reports data
+async function loadReportsData() {
+    try {
+        showLoading(true);
+        
+        // Get filters
+        const filters = {
+            start_date: document.getElementById('start-date').value,
+            end_date: document.getElementById('end-date').value,
+            department: document.getElementById('department-filter').value
+        };
+        
+        // Load tickets data for analysis
+        const params = new URLSearchParams({
+            per_page: 1000,
+            ...filters
+        });
+        
+        const response = await apiCall(`/api/tickets?${params}`);
+        const ticketsData = response.data;
+        
+        // Analyze data
+        const analytics = analyzeTicketsData(ticketsData.tickets);
+        
+        // Update metrics
+        updateMetrics(analytics);
+        
+        // Update charts
+        updateCharts(analytics);
+        
+        // Update tables
+        updateSLAViolationsTable(analytics.slaViolations);
+        updateTopIssuesTable(analytics.topIssues);
+        
+        currentFilters = filters;
+        
+    } catch (error) {
+        showToast('Erro ao carregar dados dos relatórios', 'error');
+        console.error(error);
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Analyze tickets data
+function analyzeTicketsData(tickets) {
+    const analytics = {
+        total: tickets.length,
+        resolved: tickets.filter(t => t.status === 'Resolvido' || t.status === 'Fechado').length,
+        slaViolated: tickets.filter(t => t.sla_violated).length,
+        byStatus: {},
+        byPriority: {},
+        byDepartment: {},
+        byTechnician: {},
+        slaViolations: [],
+        topIssues: {},
+        resolutionTimes: []
+    };
+    
+    // Calculate resolution rate
+    analytics.resolutionRate = analytics.total > 0 ? 
+        ((analytics.resolved / analytics.total) * 100).toFixed(1) : 0;
+    
+    // Calculate SLA compliance
+    analytics.slaCompliance = analytics.total > 0 ? 
+        (((analytics.total - analytics.slaViolated) / analytics.total) * 100).toFixed(1) : 100;
+    
+    // Group by status
+    tickets.forEach(ticket => {
+        analytics.byStatus[ticket.status] = (analytics.byStatus[ticket.status] || 0) + 1;
+        analytics.byPriority[ticket.priority] = (analytics.byPriority[ticket.priority] || 0) + 1;
+        analytics.byDepartment[ticket.department] = (analytics.byDepartment[ticket.department] || 0) + 1;
+        
+        if (ticket.assigned_to) {
+            const techName = ticket.assigned_to.name;
+            analytics.byTechnician[techName] = (analytics.byTechnician[techName] || 0) + 1;
+        }
+        
+        // SLA violations
+        if (ticket.sla_violated) {
+            analytics.slaViolations.push({
+                id: ticket.id,
+                title: ticket.title,
+                priority: ticket.priority,
+                exceeded_time: calculateExceededTime(ticket)
+            });
+        }
+        
+        // Resolution times
+        if (ticket.resolved_at) {
+            const created = new Date(ticket.created_at);
+            const resolved = new Date(ticket.resolved_at);
+            const hours = (resolved - created) / (1000 * 60 * 60);
+            analytics.resolutionTimes.push(hours);
+        }
+        
+        // Top issues (by keywords in title)
+        const keywords = ticket.title.toLowerCase().split(' ').filter(word => word.length > 3);
+        keywords.forEach(keyword => {
+            analytics.topIssues[keyword] = (analytics.topIssues[keyword] || 0) + 1;
+        });
+    });
+    
+    // Calculate average resolution time
+    if (analytics.resolutionTimes.length > 0) {
+        const avgHours = analytics.resolutionTimes.reduce((a, b) => a + b, 0) / analytics.resolutionTimes.length;
+        analytics.avgResolutionTime = formatHours(avgHours);
+    } else {
+        analytics.avgResolutionTime = 'N/A';
+    }
+    
+    return analytics;
+}
+
+// Calculate exceeded time for SLA violations
+function calculateExceededTime(ticket) {
+    if (!ticket.sla_deadline) return 'N/A';
+    
+    const deadline = new Date(ticket.sla_deadline);
+    const now = ticket.resolved_at ? new Date(ticket.resolved_at) : new Date();
+    const exceeded = (now - deadline) / (1000 * 60 * 60); // hours
+    
+    return exceeded > 0 ? formatHours(exceeded) : '0h';
+}
+
+// Format hours to human readable
+function formatHours(hours) {
+    if (hours < 1) {
+        return `${Math.round(hours * 60)}m`;
+    } else if (hours < 24) {
+        return `${Math.round(hours * 10) / 10}h`;
+    } else {
+        const days = Math.floor(hours / 24);
+        const remainingHours = Math.round(hours % 24);
+        return `${days}d ${remainingHours}h`;
+    }
+}
+
+// Update metrics display
+function updateMetrics(analytics) {
+    document.getElementById('metric-total').textContent = analytics.total;
+    document.getElementById('metric-resolution-rate').textContent = `${analytics.resolutionRate}%`;
+    document.getElementById('metric-avg-time').textContent = analytics.avgResolutionTime;
+    document.getElementById('metric-sla-compliance').textContent = `${analytics.slaCompliance}%`;
+}
+
+// Update all charts
+function updateCharts(analytics) {
+    updateStatusTrendChart(analytics);
+    updateDepartmentChart(analytics);
+    updatePriorityDistributionChart(analytics);
+    updateTechnicianPerformanceChart(analytics);
+}
+
+// Status trend chart
+function updateStatusTrendChart(analytics) {
+    const ctx = document.getElementById('statusTrendChart').getContext('2d');
+    
+    if (charts.statusTrend) {
+        charts.statusTrend.destroy();
+    }
+    
+    charts.statusTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Aberto', 'Em Andamento', 'Resolvido', 'Fechado'],
+            datasets: [{
+                label: 'Número de Chamados',
+                data: [
+                    analytics.byStatus['Aberto'] || 0,
+                    analytics.byStatus['Em Andamento'] || 0,
+                    analytics.byStatus['Resolvido'] || 0,
+                    analytics.byStatus['Fechado'] || 0
+                ],
+                borderColor: '#0ea5e9',
+                backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Department chart
+function updateDepartmentChart(analytics) {
+    const ctx = document.getElementById('departmentChart').getContext('2d');
+    
+    if (charts.department) {
+        charts.department.destroy();
+    }
+    
+    const departments = Object.keys(analytics.byDepartment);
+    const counts = Object.values(analytics.byDepartment);
+    
+    charts.department = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: departments,
+            datasets: [{
+                data: counts,
+                backgroundColor: [
+                    '#0ea5e9', '#14b8a6', '#d946ef', '#f59e0b',
+                    '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// Priority distribution chart
+function updatePriorityDistributionChart(analytics) {
+    const ctx = document.getElementById('priorityDistributionChart').getContext('2d');
+    
+    if (charts.priority) {
+        charts.priority.destroy();
+    }
+    
+    charts.priority = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Alta', 'Média', 'Baixa'],
+            datasets: [{
+                label: 'Chamados',
+                data: [
+                    analytics.byPriority['Alta'] || 0,
+                    analytics.byPriority['Média'] || 0,
+                    analytics.byPriority['Baixa'] || 0
+                ],
+                backgroundColor: ['#ef4444', '#f59e0b', '#22c55e']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Technician performance chart
+function updateTechnicianPerformanceChart(analytics) {
+    const ctx = document.getElementById('technicianPerformanceChart').getContext('2d');
+    
+    if (charts.technician) {
+        charts.technician.destroy();
+    }
+    
+    const technicians = Object.keys(analytics.byTechnician).slice(0, 10); // Top 10
+    const counts = technicians.map(tech => analytics.byTechnician[tech]);
+    
+    charts.technician = new Chart(ctx, {
+        type: 'horizontalBar',
+        data: {
+            labels: technicians,
+            datasets: [{
+                label: 'Chamados Atendidos',
+                data: counts,
+                backgroundColor: '#14b8a6'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Update SLA violations table
+function updateSLAViolationsTable(violations) {
+    const tbody = document.getElementById('sla-violations-table');
+    
+    if (violations.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+                    Nenhuma violação de SLA encontrada
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = violations.slice(0, 5).map(violation => `
+        <tr>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900">#${violation.id}</div>
+                <div class="text-sm text-gray-500 max-w-xs truncate">${violation.title}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityClasses(violation.priority)}">
+                    ${violation.priority}
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                ${violation.exceeded_time}
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Update top issues table
+function updateTopIssuesTable(issues) {
+    const container = document.getElementById('top-issues-list');
+    
+    const topIssues = Object.entries(issues)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5);
+    
+    if (topIssues.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">Nenhum problema identificado</p>';
+        return;
+    }
+    
+    container.innerHTML = topIssues.map(([issue, count]) => `
+        <div class="flex justify-between items-center">
+            <span class="text-sm text-gray-900 capitalize">${issue}</span>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                ${count} ${count === 1 ? 'ocorrência' : 'ocorrências'}
+            </span>
+        </div>
+    `).join('');
+}
+
+// Export tickets to CSV
+async function exportTicketsCSV() {
+    try {
+        showLoading(true);
+        
+        const params = new URLSearchParams(currentFilters);
+        window.open(`/api/reports/tickets?${params}`, '_blank');
+        
+        showToast('Relatório exportado com sucesso!', 'success');
+        
+    } catch (error) {
+        showToast('Erro ao exportar relatório', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Check authentication and permissions
+    const currentUser = getCurrentUser();
+    if (!currentUser || !['Administrador', 'Diretoria'].includes(currentUser.role)) {
+        showToast('Acesso negado. Apenas administradores e diretoria podem acessar esta página.', 'error');
+        window.location.href = '/dashboard';
+        return;
+    }
+    
+    // Initialize
+    initializeDateFilters();
+    loadReportsData();
+    
+    // Event handlers
+    document.getElementById('apply-filters').addEventListener('click', loadReportsData);
+    document.getElementById('refresh-data-btn').addEventListener('click', loadReportsData);
+    document.getElementById('export-tickets-btn').addEventListener('click', exportTicketsCSV);
+    
+    // Auto-refresh every 5 minutes
+    setInterval(loadReportsData, 5 * 60 * 1000);
+});
+
+// Cleanup charts on page unload
+window.addEventListener('beforeunload', function() {
+    Object.values(charts).forEach(chart => {
+        if (chart) chart.destroy();
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Chamados TI{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': {
+                            50: 'hsl(219, 89%, 97%)',
+                            100: 'hsl(219, 79%, 92%)',
+                            200: 'hsl(219, 75%, 84%)',
+                            300: 'hsl(219, 69%, 74%)',
+                            400: 'hsl(219, 62%, 62%)',
+                            500: 'hsl(219, 58%, 51%)',
+                            600: 'hsl(219, 67%, 43%)',
+                            700: 'hsl(219, 72%, 35%)',
+                            800: 'hsl(219, 74%, 29%)',
+                            900: 'hsl(219, 78%, 23%)',
+                            950: 'hsl(219, 85%, 15%)'
+                        },
+                        'accent': {
+                            50: 'hsl(166, 76%, 97%)',
+                            100: 'hsl(167, 85%, 89%)',
+                            200: 'hsl(168, 84%, 78%)',
+                            300: 'hsl(171, 77%, 64%)',
+                            400: 'hsl(172, 66%, 50%)',
+                            500: 'hsl(173, 58%, 39%)',
+                            600: 'hsl(175, 60%, 30%)',
+                            700: 'hsl(175, 64%, 24%)',
+                            800: 'hsl(176, 69%, 19%)',
+                            900: 'hsl(176, 74%, 15%)'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <!-- Feather Icons -->
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50">
+    {% if not hide_navigation %}
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <!-- Logo -->
+                    <div class="flex-shrink-0 flex items-center">
+                        <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <h1 class="text-xl font-bold text-gray-900">HelpDesk TI</h1>
+                    </div>
+                    
+                    <!-- Navigation Links -->
+                    <div class="hidden md:ml-8 md:flex md:space-x-4">
+                        <a href="/dashboard" class="nav-link" data-nav="dashboard">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z"></path>
+                            </svg>
+                            Dashboard
+                        </a>
+                        <a href="/tickets" class="nav-link" data-nav="tickets">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Chamados
+                        </a>
+                        <a href="/users" class="nav-link" data-nav="users" data-role-required="administrador">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                            </svg>
+                            Usuários
+                        </a>
+                        <a href="/reports" class="nav-link" data-nav="reports" data-role-required="administrador,diretoria">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Relatórios
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- User Menu -->
+                <div class="flex items-center space-x-4">
+                    <!-- Notifications -->
+                    <div class="relative">
+                        <button type="button" class="p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg">
+                            <span class="sr-only">Notificações</span>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <!-- User Info -->
+                    <div class="flex items-center space-x-3">
+                        <div class="text-right hidden sm:block">
+                            <p class="text-sm font-medium text-gray-900" data-user-info>Usuário</p>
+                            <p class="text-xs text-gray-500" data-user-role>Função</p>
+                        </div>
+                        <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                        </div>
+                        
+                        <!-- Logout Button -->
+                        <button type="button" class="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg p-2" data-action="logout">
+                            <span class="sr-only">Sair</span>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Navigation -->
+        <div class="md:hidden border-t border-gray-200">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="/dashboard" class="nav-link block" data-nav="dashboard">Dashboard</a>
+                <a href="/tickets" class="nav-link block" data-nav="tickets">Chamados</a>
+                <a href="/users" class="nav-link block" data-nav="users" data-role-required="administrador">Usuários</a>
+                <a href="/reports" class="nav-link block" data-nav="reports" data-role-required="administrador,diretoria">Relatórios</a>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+    
+    <!-- Main Content -->
+    <main class="{% if not hide_navigation %}max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8{% endif %}">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Global Scripts -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    
+    <!-- Initialize Feather Icons -->
+    <script>
+        feather.replace();
+        
+        // Set active navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.nav-link').forEach(link => {
+                const href = link.getAttribute('href');
+                if (href === currentPath || (href !== '/' && currentPath.startsWith(href))) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,335 @@
+/* Custom IT Helpdesk Color Scheme */
+:root {
+  /* Primary Tech Blue Palette */
+  --primary-50: 219 89% 97%;   /* #EBF5FF */
+  --primary-100: 219 79% 92%;  /* #DBEAFE */
+  --primary-200: 219 75% 84%;  /* #BFDBFE */
+  --primary-300: 219 69% 74%;  /* #93C5FD */
+  --primary-400: 219 62% 62%;  /* #60A5FA */
+  --primary-500: 219 58% 51%;  /* #3B82F6 */
+  --primary-600: 219 67% 43%;  /* #2563EB */
+  --primary-700: 219 72% 35%;  /* #1D4ED8 */
+  --primary-800: 219 74% 29%;  /* #1E40AF */
+  --primary-900: 219 78% 23%;  /* #1E3A8A */
+  --primary-950: 219 85% 15%;  /* #172554 */
+  
+  /* Tech Teal Accent */
+  --accent-50: 166 76% 97%;    /* #F0FDFA */
+  --accent-100: 167 85% 89%;   /* #CCFBF1 */
+  --accent-200: 168 84% 78%;   /* #99F6E4 */
+  --accent-300: 171 77% 64%;   /* #5EEAD4 */
+  --accent-400: 172 66% 50%;   /* #2DD4BF */
+  --accent-500: 173 58% 39%;   /* #14B8A6 */
+  --accent-600: 175 60% 30%;   /* #0D9488 */
+  --accent-700: 175 64% 24%;   /* #0F766E */
+  --accent-800: 176 69% 19%;   /* #115E59 */
+  --accent-900: 176 74% 15%;   /* #134E4A */
+  
+  /* Priority Colors */
+  --priority-high: 0 84% 60%;    /* #F87171 - Red */
+  --priority-medium: 45 93% 58%; /* #FBBF24 - Yellow */
+  --priority-low: 142 71% 45%;   /* #22C55E - Green */
+  
+  /* Status Colors */
+  --status-open: 221 83% 53%;      /* #3B82F6 - Blue */
+  --status-progress: 262 83% 58%;  /* #8B5CF6 - Purple */
+  --status-resolved: 142 71% 45%;  /* #22C55E - Green */
+  --status-closed: 220 14% 46%;    /* #6B7280 - Gray */
+  
+  /* Neutral Grays */
+  --neutral-50: 210 20% 98%;   /* #F9FAFB */
+  --neutral-100: 220 14% 96%;  /* #F3F4F6 */
+  --neutral-200: 220 13% 91%;  /* #E5E7EB */
+  --neutral-300: 219 14% 83%;  /* #D1D5DB */
+  --neutral-400: 218 11% 65%;  /* #9CA3AF */
+  --neutral-500: 220 9% 46%;   /* #6B7280 */
+  --neutral-600: 220 14% 37%;  /* #4B5563 */
+  --neutral-700: 219 16% 28%;  /* #374151 */
+  --neutral-800: 222 19% 20%;  /* #1F2937 */
+  --neutral-900: 224 21% 14%;  /* #111827 */
+  
+  /* Semantic Colors */
+  --success: 142 71% 45%;      /* #22C55E */
+  --warning: 45 93% 58%;       /* #FBBF24 */
+  --error: 0 84% 60%;          /* #F87171 */
+  --info: 204 94% 94%;         /* #EBF8FF */
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: hsl(var(--neutral-50));
+  color: hsl(var(--neutral-800));
+  line-height: 1.6;
+}
+
+/* Custom Tailwind Components */
+.btn-primary {
+  @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+.btn-secondary {
+  @apply bg-neutral-200 hover:bg-neutral-300 text-neutral-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+.btn-success {
+  @apply bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+.btn-danger {
+  @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+.card {
+  @apply bg-white rounded-xl shadow-sm border border-neutral-200 p-6;
+}
+
+.card-header {
+  @apply border-b border-neutral-200 pb-4 mb-4;
+}
+
+/* Priority Badges */
+.priority-alta {
+  @apply bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.priority-media {
+  @apply bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.priority-baixa {
+  @apply bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium;
+}
+
+/* Status Badges */
+.status-aberto {
+  @apply bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.status-em_andamento {
+  @apply bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.status-resolvido {
+  @apply bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.status-fechado {
+  @apply bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs font-medium;
+}
+
+/* SLA Alert Styles */
+.sla-alert {
+  @apply border-l-4 p-4 rounded-r-lg;
+}
+
+.sla-critical {
+  @apply bg-red-50 border-red-500 text-red-700;
+}
+
+.sla-warning {
+  @apply bg-yellow-50 border-yellow-500 text-yellow-700;
+}
+
+.sla-normal {
+  @apply bg-green-50 border-green-500 text-green-700;
+}
+
+/* Chat Styles */
+.chat-container {
+  @apply h-96 overflow-y-auto bg-gray-50 rounded-lg p-4;
+}
+
+.chat-message {
+  @apply mb-4 p-3 rounded-lg;
+}
+
+.chat-message.own {
+  @apply bg-primary-100 ml-8 text-right;
+}
+
+.chat-message.other {
+  @apply bg-white mr-8;
+}
+
+.chat-message.system {
+  @apply bg-gray-100 text-gray-600 text-center text-sm italic;
+}
+
+/* Dashboard Grid */
+.dashboard-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6;
+}
+
+.stat-card {
+  @apply bg-gradient-to-br from-white to-gray-50 p-6 rounded-xl shadow-sm border border-gray-200;
+}
+
+/* Form Styles */
+.form-group {
+  @apply mb-4;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700 mb-2;
+}
+
+.form-input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors;
+}
+
+.form-select {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white;
+}
+
+.form-textarea {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-vertical min-h-[100px];
+}
+
+/* Navigation */
+.nav-link {
+  @apply flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200;
+}
+
+.nav-link.active {
+  @apply bg-primary-100 text-primary-700;
+}
+
+.nav-link:not(.active) {
+  @apply text-gray-600 hover:bg-gray-100 hover:text-gray-900;
+}
+
+/* Table Styles */
+.table {
+  @apply w-full border-collapse;
+}
+
+.table th {
+  @apply px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 bg-gray-50;
+}
+
+.table td {
+  @apply px-4 py-3 border-b border-gray-200;
+}
+
+.table tbody tr:hover {
+  @apply bg-gray-50;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4;
+}
+
+.modal-content {
+  @apply bg-white rounded-xl shadow-xl max-w-lg w-full max-h-full overflow-y-auto;
+}
+
+.modal-header {
+  @apply px-6 py-4 border-b border-gray-200;
+}
+
+.modal-body {
+  @apply px-6 py-4;
+}
+
+.modal-footer {
+  @apply px-6 py-4 border-t border-gray-200 flex justify-end space-x-3;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  @apply inline-block w-4 h-4 border-2 border-current border-r-transparent rounded-full animate-spin;
+}
+
+/* Utility Classes */
+.text-priority-alta {
+  color: hsl(var(--priority-high));
+}
+
+.text-priority-media {
+  color: hsl(var(--priority-medium));
+}
+
+.text-priority-baixa {
+  color: hsl(var(--priority-low));
+}
+
+.bg-primary-custom {
+  background-color: hsl(var(--primary-600));
+}
+
+.text-primary-custom {
+  color: hsl(var(--primary-600));
+}
+
+.border-primary-custom {
+  border-color: hsl(var(--primary-600));
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-grid {
+    @apply grid-cols-1;
+  }
+  
+  .table-responsive {
+    @apply overflow-x-auto;
+  }
+  
+  .modal-content {
+    @apply mx-4;
+  }
+}
+
+/* Animation Classes */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--neutral-100));
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--neutral-300));
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--neutral-400));
+}

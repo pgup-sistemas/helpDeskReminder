@@ -1,0 +1,570 @@
+{% extends "base.html" %}
+
+{% block title %}Chamados - Sistema de Chamados TI{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Chamados</h1>
+            <p class="mt-1 text-sm text-gray-600">
+                Gerencie todos os chamados do sistema
+            </p>
+        </div>
+        <button 
+            type="button" 
+            id="new-ticket-btn"
+            class="btn-primary"
+        >
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Novo Chamado
+        </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold">Filtros</h3>
+        </div>
+        <form id="filters-form" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+                <label class="form-label">Status</label>
+                <select id="filter-status" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="aberto">Aberto</option>
+                    <option value="em_andamento">Em Andamento</option>
+                    <option value="resolvido">Resolvido</option>
+                    <option value="fechado">Fechado</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label">Prioridade</label>
+                <select id="filter-priority" class="form-select">
+                    <option value="">Todas</option>
+                    <option value="alta">Alta</option>
+                    <option value="media">Média</option>
+                    <option value="baixa">Baixa</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label">Departamento</label>
+                <select id="filter-department" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="TI">TI</option>
+                    <option value="Vendas">Vendas</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="RH">RH</option>
+                    <option value="Financeiro">Financeiro</option>
+                </select>
+            </div>
+
+            <div data-role-required="tecnico,administrador">
+                <label class="form-label">Técnico</label>
+                <select id="filter-technician" class="form-select">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+
+            <div class="flex items-end">
+                <button type="submit" class="btn-primary w-full">
+                    Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tickets Table -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="text-lg font-semibold">Lista de Chamados</h3>
+            <div class="text-sm text-gray-600">
+                <span id="tickets-count">0</span> chamados encontrados
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Título</th>
+                        <th>Status</th>
+                        <th>Prioridade</th>
+                        <th>Solicitante</th>
+                        <th>Técnico</th>
+                        <th>Departamento</th>
+                        <th>SLA</th>
+                        <th>Criado em</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tickets-tbody">
+                    <tr>
+                        <td colspan="10" class="text-center py-8">
+                            <div class="loading-spinner mx-auto"></div>
+                            <p class="text-gray-500 mt-2">Carregando chamados...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- New Ticket Modal -->
+<div id="new-ticket-modal" class="modal-overlay hidden">
+    <div class="modal-content max-w-2xl">
+        <div class="modal-header">
+            <h3 class="text-lg font-semibold">Novo Chamado</h3>
+        </div>
+        <form id="new-ticket-form">
+            <div class="modal-body space-y-4">
+                <div>
+                    <label class="form-label">Título *</label>
+                    <input type="text" id="ticket-title" class="form-input" required>
+                </div>
+
+                <div>
+                    <label class="form-label">Descrição *</label>
+                    <textarea id="ticket-description" class="form-textarea" rows="4" required></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">Departamento *</label>
+                        <select id="ticket-department" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            <option value="TI">TI</option>
+                            <option value="Vendas">Vendas</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="RH">RH</option>
+                            <option value="Financeiro">Financeiro</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label">Prioridade *</label>
+                        <select id="ticket-priority" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            <option value="alta">Alta (4h)</option>
+                            <option value="media">Média (8h)</option>
+                            <option value="baixa">Baixa (24h)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="form-label">Observações</label>
+                    <textarea id="ticket-observations" class="form-textarea" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn-primary">Criar Chamado</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Ticket Actions Modal -->
+<div id="ticket-actions-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="text-lg font-semibold">Ações do Chamado</h3>
+        </div>
+        <div class="modal-body space-y-4" id="ticket-actions-body">
+            <!-- Dynamic content -->
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" data-dismiss="modal">Fechar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Redirect if not authenticated
+    if (!localStorage.getItem('token')) {
+        window.location.href = '/';
+    }
+
+    class TicketsManager {
+        constructor() {
+            this.tickets = [];
+            this.technicians = [];
+            this.init();
+        }
+
+        async init() {
+            await this.loadTechnicians();
+            await this.loadTickets();
+            this.setupEventListeners();
+            this.setupFilters();
+        }
+
+        async loadTechnicians() {
+            try {
+                const response = await axios.get('/api/technicians');
+                this.technicians = response.data;
+                this.populateTechnicianFilter();
+            } catch (error) {
+                console.error('Failed to load technicians:', error);
+            }
+        }
+
+        populateTechnicianFilter() {
+            const select = document.getElementById('filter-technician');
+            if (select) {
+                this.technicians.forEach(tech => {
+                    const option = document.createElement('option');
+                    option.value = tech.id;
+                    option.textContent = tech.username;
+                    select.appendChild(option);
+                });
+            }
+        }
+
+        async loadTickets(filters = {}) {
+            try {
+                const params = new URLSearchParams(filters);
+                const response = await axios.get(`/api/tickets?${params}`);
+                this.tickets = response.data;
+                this.renderTickets();
+                this.updateTicketsCount();
+            } catch (error) {
+                console.error('Failed to load tickets:', error);
+                this.showError('Erro ao carregar chamados');
+            }
+        }
+
+        renderTickets() {
+            const tbody = document.getElementById('tickets-tbody');
+            
+            if (this.tickets.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="10" class="text-center py-8">
+                            <div class="text-gray-500">
+                                <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <p>Nenhum chamado encontrado</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = this.tickets.map(ticket => {
+                const slaClass = this.getSLAClass(ticket.time_until_sla);
+                const slaText = this.formatSLATime(ticket.time_until_sla);
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="font-mono text-sm">#${ticket.id}</td>
+                        <td>
+                            <div class="max-w-xs">
+                                <p class="font-medium truncate">${ticket.title}</p>
+                                <p class="text-xs text-gray-500 truncate">${ticket.description.substring(0, 50)}...</p>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status-${ticket.status}">
+                                ${this.formatStatus(ticket.status)}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="priority-${ticket.priority}">
+                                ${ticket.priority}
+                            </span>
+                        </td>
+                        <td class="text-sm">${ticket.requester || '-'}</td>
+                        <td class="text-sm">${ticket.assigned_to || '-'}</td>
+                        <td class="text-sm">${ticket.department}</td>
+                        <td>
+                            <span class="text-xs px-2 py-1 rounded-full ${slaClass}">
+                                ${slaText}
+                            </span>
+                        </td>
+                        <td class="text-sm">${window.helpDeskApp.formatRelativeTime(ticket.created_at)}</td>
+                        <td>
+                            <div class="flex space-x-1">
+                                <a href="/ticket/${ticket.id}" class="text-primary-600 hover:text-primary-700 text-xs font-medium">
+                                    Ver
+                                </a>
+                                <button type="button" class="text-gray-600 hover:text-gray-700 text-xs font-medium" onclick="ticketsManager.showActions(${ticket.id})">
+                                    Ações
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        getSLAClass(timeRemaining) {
+            if (timeRemaining <= 0) return 'bg-red-100 text-red-800';
+            if (timeRemaining <= 3600) return 'bg-yellow-100 text-yellow-800';
+            return 'bg-green-100 text-green-800';
+        }
+
+        formatSLATime(seconds) {
+            if (seconds <= 0) return 'Vencido';
+            
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else {
+                return `${minutes}m`;
+            }
+        }
+
+        formatStatus(status) {
+            const statusMap = {
+                'aberto': 'Aberto',
+                'em_andamento': 'Em Andamento',
+                'resolvido': 'Resolvido',
+                'fechado': 'Fechado'
+            };
+            return statusMap[status] || status;
+        }
+
+        updateTicketsCount() {
+            const countElement = document.getElementById('tickets-count');
+            if (countElement) {
+                countElement.textContent = this.tickets.length;
+            }
+        }
+
+        setupEventListeners() {
+            // New ticket button
+            document.getElementById('new-ticket-btn').addEventListener('click', () => {
+                this.showNewTicketModal();
+            });
+
+            // New ticket form
+            document.getElementById('new-ticket-form').addEventListener('submit', (e) => {
+                this.handleNewTicketSubmit(e);
+            });
+
+            // Filters form
+            document.getElementById('filters-form').addEventListener('submit', (e) => {
+                this.handleFiltersSubmit(e);
+            });
+        }
+
+        setupFilters() {
+            // Get URL parameters for initial filters
+            const urlParams = new URLSearchParams(window.location.search);
+            const filters = {};
+            
+            ['status', 'priority', 'department', 'assigned_to'].forEach(param => {
+                const value = urlParams.get(param);
+                if (value) {
+                    filters[param] = value;
+                    const element = document.getElementById(`filter-${param === 'assigned_to' ? 'technician' : param}`);
+                    if (element) {
+                        element.value = value;
+                    }
+                }
+            });
+
+            if (Object.keys(filters).length > 0) {
+                this.loadTickets(filters);
+            }
+        }
+
+        showNewTicketModal() {
+            document.getElementById('new-ticket-modal').classList.remove('hidden');
+            document.getElementById('ticket-title').focus();
+        }
+
+        async handleNewTicketSubmit(e) {
+            e.preventDefault();
+            
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const formData = {
+                title: document.getElementById('ticket-title').value,
+                description: document.getElementById('ticket-description').value,
+                department: document.getElementById('ticket-department').value,
+                priority: document.getElementById('ticket-priority').value,
+                observations: document.getElementById('ticket-observations').value
+            };
+
+            try {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<div class="loading-spinner mr-2"></div>Criando...';
+
+                await axios.post('/api/tickets', formData);
+                
+                window.helpDeskApp.showAlert('Chamado criado com sucesso!', 'success');
+                this.closeModal();
+                this.resetNewTicketForm();
+                this.loadTickets();
+
+            } catch (error) {
+                console.error('Failed to create ticket:', error);
+                window.helpDeskApp.showAlert(
+                    error.response?.data?.message || 'Erro ao criar chamado',
+                    'error'
+                );
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Criar Chamado';
+            }
+        }
+
+        handleFiltersSubmit(e) {
+            e.preventDefault();
+            
+            const filters = {};
+            const formData = new FormData(e.target);
+            
+            const status = document.getElementById('filter-status').value;
+            const priority = document.getElementById('filter-priority').value;
+            const department = document.getElementById('filter-department').value;
+            const technician = document.getElementById('filter-technician').value;
+
+            if (status) filters.status = status;
+            if (priority) filters.priority = priority;
+            if (department) filters.department = department;
+            if (technician) filters.assigned_to = technician;
+
+            this.loadTickets(filters);
+
+            // Update URL
+            const params = new URLSearchParams(filters);
+            const newUrl = `${window.location.pathname}?${params}`;
+            window.history.pushState({}, '', newUrl);
+        }
+
+        async showActions(ticketId) {
+            const ticket = this.tickets.find(t => t.id === ticketId);
+            if (!ticket) return;
+
+            const modal = document.getElementById('ticket-actions-modal');
+            const body = document.getElementById('ticket-actions-body');
+            
+            // Check user permissions
+            const user = window.helpDeskApp.user;
+            const canModify = user.role === 'administrador' || 
+                             (user.role === 'tecnico' && (ticket.assigned_to === user.username || !ticket.assigned_to)) ||
+                             (user.role === 'colaborador' && ticket.requester === user.username && ticket.status === 'aberto');
+
+            let actionsHTML = `
+                <div class="space-y-3">
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <h4 class="font-medium">${ticket.title}</h4>
+                        <p class="text-sm text-gray-600">ID: #${ticket.id}</p>
+                    </div>
+            `;
+
+            if (canModify) {
+                actionsHTML += `
+                    <div class="space-y-2">
+                        <h5 class="font-medium text-sm">Status</h5>
+                        <select id="action-status" class="form-select">
+                            <option value="aberto" ${ticket.status === 'aberto' ? 'selected' : ''}>Aberto</option>
+                            <option value="em_andamento" ${ticket.status === 'em_andamento' ? 'selected' : ''}>Em Andamento</option>
+                            <option value="resolvido" ${ticket.status === 'resolvido' ? 'selected' : ''}>Resolvido</option>
+                            <option value="fechado" ${ticket.status === 'fechado' ? 'selected' : ''}>Fechado</option>
+                        </select>
+                    </div>
+                `;
+
+                if (user.role === 'administrador' || user.role === 'tecnico') {
+                    actionsHTML += `
+                        <div class="space-y-2">
+                            <h5 class="font-medium text-sm">Técnico Responsável</h5>
+                            <select id="action-technician" class="form-select">
+                                <option value="">Nenhum</option>
+                                ${this.technicians.map(tech => `
+                                    <option value="${tech.id}" ${ticket.assigned_to === tech.username ? 'selected' : ''}>
+                                        ${tech.username}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                    `;
+                }
+
+                actionsHTML += `
+                    <div class="pt-3">
+                        <button type="button" class="btn-primary w-full" onclick="ticketsManager.updateTicket(${ticketId})">
+                            Atualizar Chamado
+                        </button>
+                    </div>
+                `;
+            } else {
+                actionsHTML += `
+                    <div class="text-center text-gray-500 py-4">
+                        <p>Você não tem permissão para modificar este chamado.</p>
+                    </div>
+                `;
+            }
+
+            actionsHTML += '</div>';
+            body.innerHTML = actionsHTML;
+            modal.classList.remove('hidden');
+        }
+
+        async updateTicket(ticketId) {
+            const status = document.getElementById('action-status')?.value;
+            const technicianId = document.getElementById('action-technician')?.value;
+            
+            const updateData = {};
+            if (status) updateData.status = status;
+            if (technicianId !== undefined) updateData.assigned_to_id = technicianId || null;
+
+            try {
+                await axios.put(`/api/tickets/${ticketId}`, updateData);
+                window.helpDeskApp.showAlert('Chamado atualizado com sucesso!', 'success');
+                this.closeModal();
+                this.loadTickets();
+            } catch (error) {
+                console.error('Failed to update ticket:', error);
+                window.helpDeskApp.showAlert('Erro ao atualizar chamado', 'error');
+            }
+        }
+
+        closeModal() {
+            document.querySelectorAll('.modal-overlay').forEach(modal => {
+                modal.classList.add('hidden');
+            });
+        }
+
+        resetNewTicketForm() {
+            document.getElementById('new-ticket-form').reset();
+        }
+
+        showError(message) {
+            const tbody = document.getElementById('tickets-tbody');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="10" class="text-center py-8">
+                        <div class="text-red-500">
+                            <svg class="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                            <p>${message}</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    // Initialize tickets manager
+    const ticketsManager = new TicketsManager();
+    window.ticketsManager = ticketsManager;
+</script>
+{% endblock %}
