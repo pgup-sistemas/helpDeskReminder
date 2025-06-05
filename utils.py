@@ -10,6 +10,52 @@ def allowed_file(filename):
 
 def create_demo_users():
     """Create demo users if they don't exist"""
+    
+    # Check if admin user exists
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(
+            username='admin',
+            email='admin@company.com',
+            role=UserRole.ADMINISTRADOR,
+            department='TI'
+        )
+        admin.set_password('admin123')
+        db.session.add(admin)
+    
+    # Check if technician exists
+    tech = User.query.filter_by(username='tecnico').first()
+    if not tech:
+        tech = User(
+            username='tecnico',
+            email='tecnico@company.com',
+            role=UserRole.TECNICO,
+            department='TI'
+        )
+        tech.set_password('tecnico123')
+        db.session.add(tech)
+    
+    # Check if employee exists
+    employee = User.query.filter_by(username='colaborador').first()
+    if not employee:
+        employee = User(
+            username='colaborador',
+            email='colaborador@company.com',
+            role=UserRole.COLABORADOR,
+            department='Vendas'
+        )
+        employee.set_password('colaborador123')
+        db.session.add(employee)
+    
+    try:
+        db.session.commit()
+        print("Demo users created successfully")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating demo users: {e}")
+
+def create_demo_users():
+    """Create demo users if they don't exist"""
     demo_users = [
         {
             'username': 'admin',
