@@ -1,0 +1,87 @@
+ Prompt para gerar o Sistema de Chamados de TI (com Tailwind CSS no frontend):
+
+Crie um sistema web completo para gerenciamento de chamados técnicos da equipe de TI, com foco em rastreabilidade, comunicação interna e análise gerencial.
+
+✅ Funcionalidades principais:
+Autenticação de usuários com controle de acesso por papéis:
+
+Colaborador: Abre e acompanha chamados.
+
+Técnico: Assume, atualiza e resolve chamados.
+
+Administrador: Gerencia usuários e chamados.
+
+Diretoria: Visualiza relatórios e dashboards.
+
+Gestão de chamados com:
+
+Título, descrição, setor, prioridade (Alta, Média, Baixa), observações, anexos.
+
+Fluxo de atendimento: Aberto → Em Andamento → Resolvido → Fechado.
+
+Chat interno em tempo real por chamado, com múltiplos técnicos.
+
+Controle de SLA automático:
+
+Alta: 4h | Média: 8h | Baixa: 24h.
+
+Alertas visuais para chamados próximos de violar o SLA.
+
+Dashboard gerencial com:
+
+Indicadores: total de chamados, SLA, resoluções, pendências.
+
+Gráficos e filtros por status, técnico, setor e prioridade.
+
+Exportação de relatórios em CSV.
+
+⚙️ Tecnologias:
+Backend:
+
+Python + Flask (API REST)
+
+SQLAlchemy (ORM)
+
+Flask-JWT-Extended (autenticação via JWT)
+
+Flask-SocketIO (chat em tempo real)
+
+SQLite (pode ser substituído por PostgreSQL)
+
+Frontend:
+
+HTML + JavaScript + Tailwind CSS
+
+Integração via Axios com a API REST
+
+Chat via Socket.IO Client
+
+Layout SPA com navegação dinâmica (opcional usar Alpine.js ou outro leve)
+
+🗂️ Estrutura esperada:
+Backend separado com rotas RESTful:
+
+Autenticação, tickets, mensagens, usuários, anexos, dashboard.
+
+Frontend organizado com:
+
+Login, dashboard, abertura de chamado, detalhes do chamado (com chat e anexos), gerenciador de usuários (admin).
+
+Componentes estilizados com Tailwind (ex: cards, botões, tabelas, alertas SLA, modais).
+
+🚀 Extras:
+Sistema de usuários com senha criptografada.
+
+Suporte a anexos com upload/download.
+
+Notificações visuais e real-time via WebSocket.
+
+Usuários de demonstração:
+
+admin / admin123
+
+tecnico1 / tecnico123
+
+colaborador1 / colab123
+
+diretor / diretor123
