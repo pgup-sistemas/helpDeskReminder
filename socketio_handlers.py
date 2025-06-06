@@ -158,3 +158,84 @@ def handle_send_message(data):
         
     except Exception as e:
         emit('error', {'message': 'Failed to send message'})
+from flask_socketio import emit, join_room, leave_room
+from flask_login import current_user
+from app import socketio
+from models import Ticket, ChatMessage, db
+from auth import can_access_ticket
+
+@socketio.on('connect')
+def handle_connect():
+    if current_user.is_authenticated:
+        print(f'User {current_user.username} connected')
+        emit('connected', {'message': 'Connected to server'})
+    else:
+        print('Anonymous user connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    if current_user.is_authenticated:
+        print(f'User {current_user.username} disconnected')
+
+@socketio.on('join_ticket')
+def handle_join_ticket(data):
+    if not current_user.is_authenticated:
+        emit('error', {'message': 'Authentication required'})
+        return
+    
+    ticket_id = data.get('ticket_id')
+    if not ticket_id:
+        emit('error', {'message': 'Ticket ID required'})
+        return
+    
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket or not can_access_ticket(current_user, ticket):
+        emit('error', {'message': 'Access denied'})
+        return
+    
+    room = f'ticket_{ticket_id}'
+    join_room(room)
+    emit('joined_ticket', {'ticket_id': ticket_id, 'room': room})
+
+@socketio.on('leave_ticket')
+def handle_leave_ticket(data):
+    if not current_user.is_authenticated:
+        return
+    
+    ticket_id = data.get('ticket_id')
+    if ticket_id:
+        room = f'ticket_{ticket_id}'
+        leave_room(room)
+        emit('left_ticket', {'ticket_id': ticket_id})
+
+@socketio.on('send_message')
+def handle_send_message(data):
+    if not current_user.is_authenticated:
+        emit('error', {'message': 'Authentication required'})
+        return
+    
+    ticket_id = data.get('ticket_id')
+    content = data.get('content')
+    
+    if not ticket_id or not content:
+        emit('error', {'message': 'Ticket ID and content required'})
+        return
+    
+    ticket = Ticket.query.get(ticket_id)
+    if not ticket or not can_access_ticket(current_user, ticket):
+        emit('error', {'message': 'Access denied'})
+        return
+    
+    # Create message
+    message = ChatMessage(
+        content=content,
+        ticket_id=ticket_id,
+        author_id=current_user.id
+    )
+    
+    db.session.add(message)
+    db.session.commit()
+    
+    # Emit to room
+    room = f'ticket_{ticket_id}'
+    emit('new_message', message.to_dict(), room=room)

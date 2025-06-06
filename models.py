@@ -88,7 +88,9 @@ class Ticket(db.Model):
         self.set_sla_deadline()
     
     def set_sla_deadline(self):
-        if self.priority == TicketPriority.ALTA:
+        if self.priority == TicketPriority.CRITICA:
+            hours = 2
+        elif self.priority == TicketPriority.ALTA:
             hours = 4
         elif self.priority == TicketPriority.MEDIA:
             hours = 8
