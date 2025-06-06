@@ -1,491 +1,650 @@
-
-import os
-import csv
-from datetime import datetime
-from flask import render_template, request, jsonify, send_file, redirect, url_for, session, flash
-from flask_login import login_user, logout_user, login_required, current_user
+from flask import request, jsonify, render_template, send_file, current_app
+from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
+from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
-from io import StringIO, BytesIO
+from app import app, db
+from models import User, Ticket, Message, Attachment
+from datetime import datetime, timedelta
+import os
+import uuid
+import csv
+import io
+from sqlalchemy import func, and_, or_
 
-from app import app, db, socketio
-from models import User, Ticket, ChatMessage, TicketAttachment, UserRole, TicketStatus, TicketPriority
-from auth import role_required, can_access_ticket, can_modify_ticket
-from utils import allowed_file, get_dashboard_stats
-
-# Frontend routes
 @app.route('/')
 def index():
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login_page'))
+    return render_template('index.html')
 
 @app.route('/login')
 def login_page():
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
     return render_template('login.html')
 
-@app.route('/login', methods=['POST'])
+@app.route('/api/login', methods=['POST'])
 def login():
-    username = request.form.get('username')
-    password = request.form.get('password')
-    
-    if not username or not password:
-        flash('Username e senha são obrigatórios', 'error')
-        return redirect(url_for('login_page'))
-    
-    user = User.query.filter_by(username=username).first()
-    
-    if user and user.check_password(password) and user.is_active:
-        login_user(user, remember=True)
-        next_page = request.args.get('next')
-        return redirect(next_page) if next_page else redirect(url_for('dashboard'))
-    
-    flash('Credenciais inválidas', 'error')
-    return redirect(url_for('login_page'))
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    flash('Logout realizado com sucesso', 'success')
-    return redirect(url_for('login_page'))
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    return render_template('dashboard.html')
-
-@app.route('/tickets')
-@login_required
-def tickets():
-    return render_template('tickets.html')
-
-@app.route('/ticket/<int:ticket_id>')
-@login_required
-def ticket_detail(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-    if not can_access_ticket(current_user, ticket):
-        flash('Acesso negado', 'error')
-        return redirect(url_for('tickets'))
-    return render_template('ticket_detail.html', ticket_id=ticket_id)
-
-@app.route('/users')
-@role_required(UserRole.ADMINISTRADOR)
-def users():
-    return render_template('users.html')
-
-@app.route('/reports')
-@role_required(UserRole.ADMINISTRADOR, UserRole.DIRETORIA)
-def reports():
-    return render_template('reports.html')
-
-# API routes
-@app.route('/api/me', methods=['GET'])
-@login_required
-def get_current_user_info():
-    return jsonify(current_user.to_dict())
-
-@app.route('/api/dashboard/stats', methods=['GET'])
-@role_required(UserRole.ADMINISTRADOR, UserRole.DIRETORIA, UserRole.TECNICO)
-def dashboard_stats():
-    stats = get_dashboard_stats()
-    return jsonify(stats)
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({'error': 'Username and password are required'}), 400
+        
+        user = User.query.filter_by(username=username, active=True).first()
+        
+        if user and check_password_hash(user.password_hash, password):
+            access_token = create_access_token(identity=user.id)
+            return jsonify({
+                'access_token': access_token,
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'name': user.name,
+                    'role': user.role,
+                    'email': user.email
+                }
+            })
+        else:
+            return jsonify({'error': 'Invalid credentials'}), 401
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tickets', methods=['GET'])
-@login_required
+@jwt_required()
 def get_tickets():
-    query = Ticket.query
-    
-    # Filter based on user role
-    if current_user.role == UserRole.COLABORADOR:
-        query = query.filter_by(requester_id=current_user.id)
-    
-    # Apply filters
-    status = request.args.get('status')
-    priority = request.args.get('priority')
-    department = request.args.get('department')
-    assigned_to = request.args.get('assigned_to')
-    
-    if status:
-        query = query.filter_by(status=TicketStatus(status))
-    if priority:
-        query = query.filter_by(priority=TicketPriority(priority))
-    if department:
-        query = query.filter_by(department=department)
-    if assigned_to:
-        query = query.filter_by(assigned_to_id=int(assigned_to))
-    
-    tickets = query.order_by(Ticket.created_at.desc()).all()
-    
-    # Check SLA violations
-    for ticket in tickets:
-        ticket.check_sla_violation()
-    
-    return jsonify([ticket.to_dict() for ticket in tickets])
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        query = Ticket.query
+        
+        # Filter based on user role
+        if user.role == 'Colaborador':
+            query = query.filter_by(creator_id=user_id)
+        elif user.role == 'Técnico':
+            query = query.filter(or_(Ticket.assigned_to == user_id, Ticket.assigned_to.is_(None)))
+        # Admin and Diretoria can see all tickets
+        
+        # Apply filters from query parameters
+        status = request.args.get('status')
+        priority = request.args.get('priority')
+        department = request.args.get('department')
+        assigned_to = request.args.get('assigned_to')
+        
+        if status:
+            query = query.filter_by(status=status)
+        if priority:
+            query = query.filter_by(priority=priority)
+        if department:
+            query = query.filter_by(department=department)
+        if assigned_to:
+            query = query.filter_by(assigned_to=assigned_to)
+        
+        tickets = query.order_by(Ticket.created_at.desc()).all()
+        
+        result = []
+        for ticket in tickets:
+            # Check SLA violation
+            sla_status = 'ok'
+            if ticket.status not in ['Resolvido', 'Fechado'] and ticket.sla_due:
+                now = datetime.utcnow()
+                time_left = ticket.sla_due - now
+                if time_left.total_seconds() < 0:
+                    sla_status = 'violated'
+                elif time_left.total_seconds() < 3600:  # Less than 1 hour
+                    sla_status = 'warning'
+            
+            result.append({
+                'id': ticket.id,
+                'title': ticket.title,
+                'description': ticket.description,
+                'department': ticket.department,
+                'priority': ticket.priority,
+                'status': ticket.status,
+                'observations': ticket.observations,
+                'created_at': ticket.created_at.isoformat(),
+                'updated_at': ticket.updated_at.isoformat(),
+                'sla_due': ticket.sla_due.isoformat() if ticket.sla_due else None,
+                'sla_status': sla_status,
+                'creator': {
+                    'id': ticket.creator.id,
+                    'name': ticket.creator.name,
+                    'email': ticket.creator.email
+                },
+                'assignee': {
+                    'id': ticket.assignee.id,
+                    'name': ticket.assignee.name,
+                    'email': ticket.assignee.email
+                } if ticket.assignee else None,
+                'message_count': ticket.messages.count(),
+                'attachment_count': ticket.attachments.count()
+            })
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tickets', methods=['POST'])
-@login_required
+@jwt_required()
 def create_ticket():
-    data = request.get_json()
-    
-    required_fields = ['title', 'description', 'department', 'priority']
-    for field in required_fields:
-        if not data.get(field):
-            return jsonify({'message': f'{field} is required'}), 400
-    
-    ticket = Ticket(
-        title=data['title'],
-        description=data['description'],
-        department=data['department'],
-        priority=TicketPriority(data['priority']),
-        observations=data.get('observations', ''),
-        requester_id=current_user.id
-    )
-    
-    db.session.add(ticket)
-    db.session.commit()
-    
-    # Create system message
-    system_message = ChatMessage(
-        content=f"Chamado criado por {current_user.username}",
-        message_type='system',
-        ticket_id=ticket.id,
-        author_id=current_user.id
-    )
-    db.session.add(system_message)
-    db.session.commit()
-    
-    return jsonify(ticket.to_dict()), 201
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        required_fields = ['title', 'description', 'department', 'priority']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        ticket = Ticket(
+            title=data['title'],
+            description=data['description'],
+            department=data['department'],
+            priority=data['priority'],
+            observations=data.get('observations', ''),
+            creator_id=user_id
+        )
+        
+        db.session.add(ticket)
+        db.session.commit()
+        
+        return jsonify({'message': 'Ticket created successfully', 'ticket_id': ticket.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tickets/<int:ticket_id>', methods=['GET'])
-@login_required
+@jwt_required()
 def get_ticket(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-    
-    if not can_access_ticket(current_user, ticket):
-        return jsonify({'message': 'Access denied'}), 403
-    
-    ticket.check_sla_violation()
-    return jsonify(ticket.to_dict())
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        ticket = Ticket.query.get(ticket_id)
+        
+        if not ticket:
+            return jsonify({'error': 'Ticket not found'}), 404
+        
+        # Check permissions
+        if user.role == 'Colaborador' and ticket.creator_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Check SLA status
+        sla_status = 'ok'
+        if ticket.status not in ['Resolvido', 'Fechado'] and ticket.sla_due:
+            now = datetime.utcnow()
+            time_left = ticket.sla_due - now
+            if time_left.total_seconds() < 0:
+                sla_status = 'violated'
+            elif time_left.total_seconds() < 3600:
+                sla_status = 'warning'
+        
+        return jsonify({
+            'id': ticket.id,
+            'title': ticket.title,
+            'description': ticket.description,
+            'department': ticket.department,
+            'priority': ticket.priority,
+            'status': ticket.status,
+            'observations': ticket.observations,
+            'created_at': ticket.created_at.isoformat(),
+            'updated_at': ticket.updated_at.isoformat(),
+            'sla_due': ticket.sla_due.isoformat() if ticket.sla_due else None,
+            'sla_status': sla_status,
+            'creator': {
+                'id': ticket.creator.id,
+                'name': ticket.creator.name,
+                'email': ticket.creator.email
+            },
+            'assignee': {
+                'id': ticket.assignee.id,
+                'name': ticket.assignee.name,
+                'email': ticket.assignee.email
+            } if ticket.assignee else None
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tickets/<int:ticket_id>', methods=['PUT'])
-@login_required
+@jwt_required()
 def update_ticket(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-    
-    if not can_modify_ticket(current_user, ticket):
-        return jsonify({'message': 'Access denied'}), 403
-    
-    data = request.get_json()
-    
-    # Track changes for system messages
-    changes = []
-    
-    if 'status' in data and data['status'] != ticket.status.value:
-        old_status = ticket.status.value
-        ticket.status = TicketStatus(data['status'])
-        changes.append(f"Status alterado de {old_status} para {data['status']}")
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        ticket = Ticket.query.get(ticket_id)
         
-        if ticket.status == TicketStatus.RESOLVIDO:
-            ticket.resolved_at = datetime.utcnow()
-        elif ticket.status == TicketStatus.FECHADO:
-            ticket.closed_at = datetime.utcnow()
-    
-    if 'assigned_to_id' in data:
-        old_assigned = ticket.assigned_technician.username if ticket.assigned_technician else "Nenhum"
-        if data['assigned_to_id']:
-            new_tech = User.query.get(data['assigned_to_id'])
-            ticket.assigned_to_id = data['assigned_to_id']
-            changes.append(f"Técnico alterado de {old_assigned} para {new_tech.username}")
-        else:
-            ticket.assigned_to_id = None
-            changes.append(f"Técnico removido ({old_assigned})")
-    
-    if 'priority' in data and data['priority'] != ticket.priority.value:
-        old_priority = ticket.priority.value
-        ticket.priority = TicketPriority(data['priority'])
-        ticket.set_sla_deadline()  # Recalculate SLA
-        changes.append(f"Prioridade alterada de {old_priority} para {data['priority']}")
-    
-    if 'observations' in data:
-        ticket.observations = data['observations']
-    
-    ticket.updated_at = datetime.utcnow()
-    db.session.commit()
-    
-    # Create system messages for changes
-    for change in changes:
-        system_message = ChatMessage(
-            content=f"{change} por {current_user.username}",
-            message_type='system',
-            ticket_id=ticket.id,
-            author_id=current_user.id
-        )
-        db.session.add(system_message)
-    
-    db.session.commit()
-    
-    return jsonify(ticket.to_dict())
+        if not ticket:
+            return jsonify({'error': 'Ticket not found'}), 404
+        
+        # Check permissions
+        if user.role == 'Colaborador' and ticket.creator_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        data = request.get_json()
+        
+        # Update allowed fields based on user role
+        if user.role in ['Administrador', 'Técnico']:
+            if 'status' in data:
+                old_status = ticket.status
+                ticket.status = data['status']
+                
+                # Create system message for status change
+                if old_status != ticket.status:
+                    message = Message(
+                        content=f"Status alterado de '{old_status}' para '{ticket.status}'",
+                        ticket_id=ticket.id,
+                        user_id=user_id,
+                        message_type='system'
+                    )
+                    db.session.add(message)
+            
+            if 'assigned_to' in data:
+                ticket.assigned_to = data['assigned_to'] if data['assigned_to'] else None
+                
+                # Create system message for assignment
+                if ticket.assigned_to:
+                    assignee = User.query.get(ticket.assigned_to)
+                    message = Message(
+                        content=f"Chamado atribuído para {assignee.name}",
+                        ticket_id=ticket.id,
+                        user_id=user_id,
+                        message_type='system'
+                    )
+                    db.session.add(message)
+        
+        if 'observations' in data:
+            ticket.observations = data['observations']
+        
+        if user.role == 'Administrador':
+            # Admin can update more fields
+            if 'title' in data:
+                ticket.title = data['title']
+            if 'description' in data:
+                ticket.description = data['description']
+            if 'priority' in data:
+                ticket.priority = data['priority']
+            if 'department' in data:
+                ticket.department = data['department']
+        
+        db.session.commit()
+        
+        return jsonify({'message': 'Ticket updated successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tickets/<int:ticket_id>/messages', methods=['GET'])
-@login_required
+@jwt_required()
 def get_ticket_messages(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-    
-    if not can_access_ticket(current_user, ticket):
-        return jsonify({'message': 'Access denied'}), 403
-    
-    messages = ChatMessage.query.filter_by(ticket_id=ticket_id).order_by(ChatMessage.created_at).all()
-    return jsonify([message.to_dict() for message in messages])
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        ticket = Ticket.query.get(ticket_id)
+        
+        if not ticket:
+            return jsonify({'error': 'Ticket not found'}), 404
+        
+        # Check permissions
+        if user.role == 'Colaborador' and ticket.creator_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        messages = Message.query.filter_by(ticket_id=ticket_id).order_by(Message.timestamp.asc()).all()
+        
+        result = []
+        for message in messages:
+            result.append({
+                'id': message.id,
+                'content': message.content,
+                'timestamp': message.timestamp.isoformat(),
+                'message_type': message.message_type,
+                'author': {
+                    'id': message.author.id,
+                    'name': message.author.name,
+                    'role': message.author.role
+                }
+            })
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tickets/<int:ticket_id>/messages', methods=['POST'])
-@login_required
+@jwt_required()
 def create_message(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-    
-    if not can_access_ticket(current_user, ticket):
-        return jsonify({'message': 'Access denied'}), 403
-    
-    data = request.get_json()
-    content = data.get('content')
-    
-    if not content:
-        return jsonify({'message': 'Message content required'}), 400
-    
-    message = ChatMessage(
-        content=content,
-        ticket_id=ticket_id,
-        author_id=current_user.id
-    )
-    
-    db.session.add(message)
-    db.session.commit()
-    
-    # Emit to socket room
-    socketio.emit('new_message', message.to_dict(), room=f'ticket_{ticket_id}')
-    
-    return jsonify(message.to_dict()), 201
-
-@app.route('/api/tickets/<int:ticket_id>/attachments', methods=['POST'])
-@login_required
-def upload_attachment(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-    
-    if not can_access_ticket(current_user, ticket):
-        return jsonify({'message': 'Access denied'}), 403
-    
-    if 'file' not in request.files:
-        return jsonify({'message': 'No file provided'}), 400
-    
-    file = request.files['file']
-    
-    if file.filename == '':
-        return jsonify({'message': 'No file selected'}), 400
-    
-    if not allowed_file(file.filename):
-        return jsonify({'message': 'File type not allowed'}), 400
-    
-    original_filename = secure_filename(file.filename)
-    filename = f"{ticket_id}_{datetime.utcnow().timestamp()}_{original_filename}"
-    
-    # Ensure upload directory exists
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(file_path)
-    
-    # Get file info
-    file_size = os.path.getsize(file_path)
-    
-    attachment = TicketAttachment(
-        filename=filename,
-        original_filename=original_filename,
-        file_size=file_size,
-        mime_type=file.mimetype,
-        ticket_id=ticket_id,
-        uploaded_by_id=current_user.id
-    )
-    
-    db.session.add(attachment)
-    db.session.commit()
-    
-    # Create system message
-    system_message = ChatMessage(
-        content=f"Arquivo anexado: {original_filename}",
-        message_type='attachment',
-        ticket_id=ticket_id,
-        author_id=current_user.id
-    )
-    db.session.add(system_message)
-    db.session.commit()
-    
-    return jsonify(attachment.to_dict()), 201
-
-@app.route('/api/tickets/<int:ticket_id>/attachments', methods=['GET'])
-@login_required
-def get_attachments(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-    
-    if not can_access_ticket(current_user, ticket):
-        return jsonify({'message': 'Access denied'}), 403
-    
-    attachments = TicketAttachment.query.filter_by(ticket_id=ticket_id).all()
-    return jsonify([attachment.to_dict() for attachment in attachments])
-
-@app.route('/api/attachments/<int:attachment_id>/download', methods=['GET'])
-@login_required
-def download_attachment(attachment_id):
-    attachment = TicketAttachment.query.get_or_404(attachment_id)
-    
-    if not can_access_ticket(current_user, attachment.ticket):
-        return jsonify({'message': 'Access denied'}), 403
-    
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], attachment.filename)
-    
-    if not os.path.exists(file_path):
-        return jsonify({'message': 'File not found'}), 404
-    
-    return send_file(file_path, as_attachment=True, download_name=attachment.original_filename)
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        ticket = Ticket.query.get(ticket_id)
+        
+        if not ticket:
+            return jsonify({'error': 'Ticket not found'}), 404
+        
+        # Check permissions
+        if user.role == 'Colaborador' and ticket.creator_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        data = request.get_json()
+        content = data.get('content')
+        
+        if not content:
+            return jsonify({'error': 'Message content is required'}), 400
+        
+        message = Message(
+            content=content,
+            ticket_id=ticket_id,
+            user_id=user_id,
+            message_type='message'
+        )
+        
+        db.session.add(message)
+        db.session.commit()
+        
+        return jsonify({
+            'id': message.id,
+            'content': message.content,
+            'timestamp': message.timestamp.isoformat(),
+            'message_type': message.message_type,
+            'author': {
+                'id': message.author.id,
+                'name': message.author.name,
+                'role': message.author.role
+            }
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/users', methods=['GET'])
-@role_required(UserRole.ADMINISTRADOR)
+@jwt_required()
 def get_users():
-    users = User.query.all()
-    return jsonify([user.to_dict() for user in users])
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if user.role not in ['Administrador', 'Diretoria']:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        users = User.query.filter_by(active=True).all()
+        
+        result = []
+        for u in users:
+            result.append({
+                'id': u.id,
+                'username': u.username,
+                'name': u.name,
+                'email': u.email,
+                'role': u.role,
+                'created_at': u.created_at.isoformat()
+            })
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-@app.route('/api/users', methods=['POST'])
-@role_required(UserRole.ADMINISTRADOR)
-def create_user():
-    data = request.get_json()
-    
-    required_fields = ['username', 'email', 'password', 'role']
-    for field in required_fields:
-        if not data.get(field):
-            return jsonify({'message': f'{field} is required'}), 400
-    
-    # Check if user already exists
-    if User.query.filter_by(username=data['username']).first():
-        return jsonify({'message': 'Username already exists'}), 400
-    
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({'message': 'Email already exists'}), 400
-    
-    user = User(
-        username=data['username'],
-        email=data['email'],
-        role=UserRole(data['role']),
-        department=data.get('department', '')
-    )
-    user.set_password(data['password'])
-    
-    db.session.add(user)
-    db.session.commit()
-    
-    return jsonify(user.to_dict()), 201
-
-@app.route('/api/users/<int:user_id>', methods=['PUT'])
-@role_required(UserRole.ADMINISTRADOR)
-def update_user(user_id):
-    user = User.query.get_or_404(user_id)
-    data = request.get_json()
-    
-    if 'username' in data:
-        existing_user = User.query.filter_by(username=data['username']).first()
-        if existing_user and existing_user.id != user_id:
-            return jsonify({'message': 'Username already exists'}), 400
-        user.username = data['username']
-    
-    if 'email' in data:
-        existing_user = User.query.filter_by(email=data['email']).first()
-        if existing_user and existing_user.id != user_id:
-            return jsonify({'message': 'Email already exists'}), 400
-        user.email = data['email']
-    
-    if 'role' in data:
-        user.role = UserRole(data['role'])
-    
-    if 'department' in data:
-        user.department = data['department']
-    
-    if 'is_active' in data:
-        user.is_active = data['is_active']
-    
-    if 'password' in data and data['password']:
-        user.set_password(data['password'])
-    
-    db.session.commit()
-    
-    return jsonify(user.to_dict())
-
-@app.route('/api/technicians', methods=['GET'])
-@login_required
-def get_technicians():
-    technicians = User.query.filter_by(role=UserRole.TECNICO, is_active=True).all()
-    return jsonify([{'id': tech.id, 'username': tech.username} for tech in technicians])
+@app.route('/api/dashboard/stats', methods=['GET'])
+@jwt_required()
+def get_dashboard_stats():
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if user.role not in ['Administrador', 'Diretoria', 'Técnico']:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Basic stats
+        total_tickets = Ticket.query.count()
+        open_tickets = Ticket.query.filter(Ticket.status.in_(['Aberto', 'Em Andamento'])).count()
+        resolved_tickets = Ticket.query.filter_by(status='Resolvido').count()
+        closed_tickets = Ticket.query.filter_by(status='Fechado').count()
+        
+        # SLA stats
+        now = datetime.utcnow()
+        sla_violated = Ticket.query.filter(
+            and_(
+                Ticket.status.in_(['Aberto', 'Em Andamento']),
+                Ticket.sla_due < now
+            )
+        ).count()
+        
+        sla_warning = Ticket.query.filter(
+            and_(
+                Ticket.status.in_(['Aberto', 'Em Andamento']),
+                Ticket.sla_due > now,
+                Ticket.sla_due < now + timedelta(hours=1)
+            )
+        ).count()
+        
+        # Priority breakdown
+        priority_stats = db.session.query(
+            Ticket.priority,
+            func.count(Ticket.id).label('count')
+        ).group_by(Ticket.priority).all()
+        
+        # Status breakdown
+        status_stats = db.session.query(
+            Ticket.status,
+            func.count(Ticket.id).label('count')
+        ).group_by(Ticket.status).all()
+        
+        # Department breakdown
+        department_stats = db.session.query(
+            Ticket.department,
+            func.count(Ticket.id).label('count')
+        ).group_by(Ticket.department).all()
+        
+        # Recent activity (last 7 days)
+        week_ago = now - timedelta(days=7)
+        recent_tickets = db.session.query(
+            func.date(Ticket.created_at).label('date'),
+            func.count(Ticket.id).label('count')
+        ).filter(Ticket.created_at >= week_ago).group_by(func.date(Ticket.created_at)).all()
+        
+        return jsonify({
+            'total_tickets': total_tickets,
+            'open_tickets': open_tickets,
+            'resolved_tickets': resolved_tickets,
+            'closed_tickets': closed_tickets,
+            'sla_violated': sla_violated,
+            'sla_warning': sla_warning,
+            'priority_breakdown': [{'priority': p[0], 'count': p[1]} for p in priority_stats],
+            'status_breakdown': [{'status': s[0], 'count': s[1]} for s in status_stats],
+            'department_breakdown': [{'department': d[0], 'count': d[1]} for d in department_stats],
+            'recent_activity': [{'date': str(r[0]), 'count': r[1]} for r in recent_tickets]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/reports/export', methods=['GET'])
-@role_required(UserRole.ADMINISTRADOR, UserRole.DIRETORIA)
-def export_tickets():
-    # Get filter parameters
-    status = request.args.get('status')
-    priority = request.args.get('priority')
-    department = request.args.get('department')
-    date_from = request.args.get('date_from')
-    date_to = request.args.get('date_to')
-    
-    query = Ticket.query
-    
-    # Apply filters
-    if status:
-        query = query.filter_by(status=TicketStatus(status))
-    if priority:
-        query = query.filter_by(priority=TicketPriority(priority))
-    if department:
-        query = query.filter_by(department=department)
-    if date_from:
-        query = query.filter(Ticket.created_at >= datetime.fromisoformat(date_from))
-    if date_to:
-        query = query.filter(Ticket.created_at <= datetime.fromisoformat(date_to))
-    
-    tickets = query.order_by(Ticket.created_at.desc()).all()
-    
-    # Create CSV
-    output = StringIO()
-    writer = csv.writer(output)
-    
-    # Write header
-    writer.writerow([
-        'ID', 'Título', 'Descrição', 'Status', 'Prioridade', 'Departamento',
-        'Solicitante', 'Técnico Responsável', 'Data Criação', 'Data Resolução',
-        'SLA Violado', 'Observações'
-    ])
-    
-    # Write data
-    for ticket in tickets:
+@jwt_required()
+def export_reports():
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if user.role not in ['Administrador', 'Diretoria']:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Get filters from query parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        status = request.args.get('status')
+        priority = request.args.get('priority')
+        department = request.args.get('department')
+        
+        query = Ticket.query
+        
+        if start_date:
+            query = query.filter(Ticket.created_at >= datetime.fromisoformat(start_date))
+        if end_date:
+            query = query.filter(Ticket.created_at <= datetime.fromisoformat(end_date))
+        if status:
+            query = query.filter_by(status=status)
+        if priority:
+            query = query.filter_by(priority=priority)
+        if department:
+            query = query.filter_by(department=department)
+        
+        tickets = query.order_by(Ticket.created_at.desc()).all()
+        
+        # Create CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
         writer.writerow([
-            ticket.id,
-            ticket.title,
-            ticket.description,
-            ticket.status.value,
-            ticket.priority.value,
-            ticket.department,
-            ticket.requester.username if ticket.requester else '',
-            ticket.assigned_technician.username if ticket.assigned_technician else '',
-            ticket.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            ticket.resolved_at.strftime('%Y-%m-%d %H:%M:%S') if ticket.resolved_at else '',
-            'Sim' if ticket.sla_violated else 'Não',
-            ticket.observations or ''
+            'ID', 'Título', 'Descrição', 'Departamento', 'Prioridade', 'Status',
+            'Criado por', 'Atribuído para', 'Data de Criação', 'Data de Atualização',
+            'SLA Vencimento', 'SLA Violado'
         ])
-    
-    # Create BytesIO object for file download
-    mem = BytesIO()
-    mem.write(output.getvalue().encode('utf-8'))
-    mem.seek(0)
-    
-    return send_file(
-        mem,
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name=f'chamados_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-    )
+        
+        # Write data
+        for ticket in tickets:
+            writer.writerow([
+                ticket.id,
+                ticket.title,
+                ticket.description,
+                ticket.department,
+                ticket.priority,
+                ticket.status,
+                ticket.creator.name,
+                ticket.assignee.name if ticket.assignee else '',
+                ticket.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                ticket.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+                ticket.sla_due.strftime('%Y-%m-%d %H:%M:%S') if ticket.sla_due else '',
+                'Sim' if ticket.sla_violated else 'Não'
+            ])
+        
+        # Prepare file for download
+        output.seek(0)
+        
+        # Create a bytes buffer
+        buffer = io.BytesIO()
+        buffer.write(output.getvalue().encode('utf-8'))
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f'tickets_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+            mimetype='text/csv'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tickets/<int:ticket_id>/upload', methods=['POST'])
+@jwt_required()
+def upload_file(ticket_id):
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        ticket = Ticket.query.get(ticket_id)
+        
+        if not ticket:
+            return jsonify({'error': 'Ticket not found'}), 404
+        
+        # Check permissions
+        if user.role == 'Colaborador' and ticket.creator_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if file:
+            # Generate unique filename
+            filename = str(uuid.uuid4()) + '_' + secure_filename(file.filename)
+            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            
+            # Save file
+            file.save(file_path)
+            
+            # Create attachment record
+            attachment = Attachment(
+                filename=filename,
+                original_filename=file.filename,
+                file_size=os.path.getsize(file_path),
+                mime_type=file.content_type or 'application/octet-stream',
+                ticket_id=ticket_id,
+                uploaded_by=user_id
+            )
+            
+            db.session.add(attachment)
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'File uploaded successfully',
+                'attachment_id': attachment.id,
+                'filename': attachment.original_filename
+            }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/attachments/<int:attachment_id>/download')
+@jwt_required()
+def download_file(attachment_id):
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        attachment = Attachment.query.get(attachment_id)
+        
+        if not attachment:
+            return jsonify({'error': 'Attachment not found'}), 404
+        
+        # Check permissions
+        ticket = attachment.ticket
+        if user.role == 'Colaborador' and ticket.creator_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], attachment.filename)
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found on disk'}), 404
+        
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=attachment.original_filename,
+            mimetype=attachment.mime_type
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tickets/<int:ticket_id>/attachments', methods=['GET'])
+@jwt_required()
+def get_ticket_attachments(ticket_id):
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        ticket = Ticket.query.get(ticket_id)
+        
+        if not ticket:
+            return jsonify({'error': 'Ticket not found'}), 404
+        
+        # Check permissions
+        if user.role == 'Colaborador' and ticket.creator_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        attachments = Attachment.query.filter_by(ticket_id=ticket_id).all()
+        
+        result = []
+        for attachment in attachments:
+            result.append({
+                'id': attachment.id,
+                'filename': attachment.original_filename,
+                'file_size': attachment.file_size,
+                'mime_type': attachment.mime_type,
+                'uploaded_at': attachment.uploaded_at.isoformat(),
+                'uploader': {
+                    'id': attachment.uploader.id,
+                    'name': attachment.uploader.name
+                }
+            })
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

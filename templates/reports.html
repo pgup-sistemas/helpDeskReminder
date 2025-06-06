@@ -1,432 +1,334 @@
 {% extends "base.html" %}
 
-{% block title %}Relatórios - Sistema de Chamados TI{% endblock %}
+{% block title %}Relatórios - TechSupport Pro{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <!-- Page Header -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
     <div class="flex justify-between items-center mb-8">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Relatórios e Analytics</h1>
-            <p class="text-gray-600">Análise detalhada de performance e indicadores</p>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                <i class="fas fa-chart-bar text-tech-primary mr-3"></i>Relatórios e Análises
+            </h1>
+            <p class="text-gray-600">Monitore métricas de desempenho e gere relatórios detalhados.</p>
         </div>
-        <div class="flex items-center space-x-3">
-            <button id="export-tickets-btn" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
-                <i data-feather="download" class="w-4 h-4 mr-2"></i>
-                Exportar CSV
-            </button>
-            <button id="refresh-data-btn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
-                <i data-feather="refresh-cw" class="w-4 h-4 mr-2"></i>
-                Atualizar
-            </button>
+        
+        <button onclick="exportReport()" class="bg-tech-accent hover:bg-tech-accent-dark text-white px-6 py-3 rounded-lg transition-colors font-medium">
+            <i class="fas fa-download mr-2"></i>Exportar CSV
+        </button>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100">
+                    <i class="fas fa-ticket-alt text-blue-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Total de Chamados</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="metric-total-tickets">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100">
+                    <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Taxa de Resolução</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="metric-resolution-rate">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100">
+                    <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Cumprimento SLA</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="metric-sla-compliance">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-red-100">
+                    <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Violações SLA</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="metric-sla-violations">-</p>
+                </div>
+            </div>
         </div>
     </div>
-    
-    <!-- Date Filter -->
-    <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 mb-8">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-filter text-tech-accent mr-2"></i>Filtros de Relatório
+        </h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
-                <label for="start-date" class="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
-                <input type="date" id="start-date" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
+                <input type="date" id="filter-start-date" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
             </div>
+            
             <div>
-                <label for="end-date" class="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
-                <input type="date" id="end-date" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
+                <input type="date" id="filter-end-date" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
             </div>
+            
             <div>
-                <label for="department-filter" class="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
-                <select id="department-filter" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select id="filter-status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
+                    <option value="">Todos</option>
+                    <option value="Aberto">Aberto</option>
+                    <option value="Em Andamento">Em Andamento</option>
+                    <option value="Resolvido">Resolvido</option>
+                    <option value="Fechado">Fechado</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
+                <select id="filter-priority" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
+                    <option value="">Todas</option>
+                    <option value="Alta">Alta</option>
+                    <option value="Média">Média</option>
+                    <option value="Baixa">Baixa</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+                <select id="filter-department" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                     <option value="">Todos</option>
                     <option value="TI">TI</option>
                     <option value="RH">RH</option>
+                    <option value="Vendas">Vendas</option>
+                    <option value="Marketing">Marketing</option>
                     <option value="Financeiro">Financeiro</option>
-                    <option value="Comercial">Comercial</option>
-                    <option value="Operações">Operações</option>
-                    <option value="Administração">Administração</option>
                 </select>
             </div>
-            <div class="flex items-end">
-                <button id="apply-filters" class="w-full px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-secondary-600 hover:bg-secondary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500 transition-colors duration-200">
-                    Aplicar Filtros
-                </button>
-            </div>
+        </div>
+        
+        <div class="flex justify-between items-center mt-4">
+            <button onclick="clearReportFilters()" class="text-gray-600 hover:text-gray-800 transition-colors">
+                <i class="fas fa-times-circle mr-1"></i>Limpar Filtros
+            </button>
+            <button onclick="applyReportFilters()" class="bg-tech-accent hover:bg-tech-accent-dark text-white px-4 py-2 rounded-lg transition-colors">
+                <i class="fas fa-search mr-2"></i>Aplicar Filtros
+            </button>
         </div>
     </div>
-    
-    <!-- Key Metrics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <i data-feather="list" class="w-5 h-5 text-blue-600"></i>
-                        </div>
-                    </div>
-                    <div class="ml-4">
-                        <div class="text-sm font-medium text-gray-500">Total de Chamados</div>
-                        <div id="metric-total" class="text-2xl font-bold text-gray-900">-</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                            <i data-feather="check-circle" class="w-5 h-5 text-green-600"></i>
-                        </div>
-                    </div>
-                    <div class="ml-4">
-                        <div class="text-sm font-medium text-gray-500">Taxa de Resolução</div>
-                        <div id="metric-resolution-rate" class="text-2xl font-bold text-gray-900">-</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                            <i data-feather="clock" class="w-5 h-5 text-yellow-600"></i>
-                        </div>
-                    </div>
-                    <div class="ml-4">
-                        <div class="text-sm font-medium text-gray-500">Tempo Médio Resolução</div>
-                        <div id="metric-avg-time" class="text-2xl font-bold text-gray-900">-</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
-            <div class="p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                            <i data-feather="alert-triangle" class="w-5 h-5 text-red-600"></i>
-                        </div>
-                    </div>
-                    <div class="ml-4">
-                        <div class="text-sm font-medium text-gray-500">SLA Compliance</div>
-                        <div id="metric-sla-compliance" class="text-2xl font-bold text-gray-900">-</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
+
     <!-- Charts Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <!-- Tickets by Status Over Time -->
-        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Chamados por Status - Tendência</h3>
-            <div class="h-80">
-                <canvas id="statusTrendChart"></canvas>
+        <!-- Tickets by Priority -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-chart-pie text-tech-accent mr-2"></i>Chamados por Prioridade
+            </h3>
+            <div class="h-64">
+                <canvas id="priority-chart"></canvas>
             </div>
         </div>
-        
+
+        <!-- Tickets by Status -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-chart-doughnut text-tech-accent mr-2"></i>Chamados por Status
+            </h3>
+            <div class="h-64">
+                <canvas id="status-chart"></canvas>
+            </div>
+        </div>
+
         <!-- Tickets by Department -->
-        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Chamados por Departamento</h3>
-            <div class="h-80">
-                <canvas id="departmentChart"></canvas>
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-chart-bar text-tech-accent mr-2"></i>Chamados por Departamento
+            </h3>
+            <div class="h-64">
+                <canvas id="department-chart"></canvas>
             </div>
         </div>
-        
-        <!-- Priority Distribution -->
-        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Distribuição por Prioridade</h3>
-            <div class="h-80">
-                <canvas id="priorityDistributionChart"></canvas>
-            </div>
-        </div>
-        
-        <!-- Technician Performance -->
-        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Performance dos Técnicos</h3>
-            <div class="h-80">
-                <canvas id="technicianPerformanceChart"></canvas>
+
+        <!-- Monthly Trend -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-chart-line text-tech-accent mr-2"></i>Tendência Mensal
+            </h3>
+            <div class="h-64">
+                <canvas id="monthly-trend-chart"></canvas>
             </div>
         </div>
     </div>
-    
+
     <!-- Detailed Tables -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- SLA Violations -->
-        <div class="bg-white shadow-sm rounded-lg border border-gray-200">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-medium text-gray-900">Violações de SLA</h3>
-            </div>
+        <!-- Top Technicians -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-trophy text-tech-accent mr-2"></i>Técnicos - Desempenho
+            </h3>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chamado</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridade</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tempo Excedido</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Técnico</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resolvidos</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SLA</th>
                         </tr>
                     </thead>
-                    <tbody id="sla-violations-table" class="bg-white divide-y divide-gray-200">
-                        <!-- SLA violations will be loaded here -->
+                    <tbody id="technicians-table" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Carregando dados...
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
         </div>
-        
-        <!-- Top Issues -->
-        <div class="bg-white shadow-sm rounded-lg border border-gray-200">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-medium text-gray-900">Principais Problemas</h3>
-            </div>
-            <div class="p-6">
-                <div id="top-issues-list" class="space-y-4">
-                    <!-- Top issues will be loaded here -->
-                </div>
+
+        <!-- Department Statistics -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-building text-tech-accent mr-2"></i>Estatísticas por Departamento
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Departamento</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chamados</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tempo Médio</th>
+                        </tr>
+                    </thead>
+                    <tbody id="departments-table" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Carregando dados...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+
+    <!-- Recent Activity -->
+    <div class="mt-8 bg-white rounded-xl shadow-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-history text-tech-accent mr-2"></i>Atividade Recente
+        </h3>
+        <div id="recent-activity" class="space-y-3">
+            <!-- Recent activity will be loaded here -->
+        </div>
+    </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-let charts = {};
 let currentFilters = {};
+let charts = {};
 
-// Initialize date filters with current month
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDateFilters();
+    loadReportData();
+});
+
 function initializeDateFilters() {
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const today = new Date();
+    const lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
     
-    document.getElementById('start-date').value = firstDay.toISOString().split('T')[0];
-    document.getElementById('end-date').value = lastDay.toISOString().split('T')[0];
+    document.getElementById('filter-end-date').value = today.toISOString().split('T')[0];
+    document.getElementById('filter-start-date').value = lastMonth.toISOString().split('T')[0];
 }
 
-// Load reports data
-async function loadReportsData() {
+async function loadReportData() {
     try {
-        showLoading(true);
+        showLoading();
         
-        // Get filters
-        const filters = {
-            start_date: document.getElementById('start-date').value,
-            end_date: document.getElementById('end-date').value,
-            department: document.getElementById('department-filter').value
-        };
+        // Load dashboard stats for key metrics
+        const statsResponse = await axios.get('/api/dashboard/stats');
+        const stats = statsResponse.data;
         
-        // Load tickets data for analysis
-        const params = new URLSearchParams({
-            per_page: 1000,
-            ...filters
-        });
+        updateKeyMetrics(stats);
         
-        const response = await apiCall(`/api/tickets?${params}`);
-        const ticketsData = response.data;
+        // Load tickets for detailed analysis
+        const ticketsResponse = await axios.get('/api/tickets?per_page=1000');
+        const tickets = ticketsResponse.data.tickets;
         
-        // Analyze data
-        const analytics = analyzeTicketsData(ticketsData.tickets);
-        
-        // Update metrics
-        updateMetrics(analytics);
-        
-        // Update charts
-        updateCharts(analytics);
-        
-        // Update tables
-        updateSLAViolationsTable(analytics.slaViolations);
-        updateTopIssuesTable(analytics.topIssues);
-        
-        currentFilters = filters;
+        generateCharts(tickets);
+        generateTables(tickets);
         
     } catch (error) {
-        showToast('Erro ao carregar dados dos relatórios', 'error');
-        console.error(error);
+        console.error('Error loading report data:', error);
+        showToast('Erro ao carregar dados do relatório', 'error');
     } finally {
-        showLoading(false);
+        hideLoading();
     }
 }
 
-// Analyze tickets data
-function analyzeTicketsData(tickets) {
-    const analytics = {
-        total: tickets.length,
-        resolved: tickets.filter(t => t.status === 'Resolvido' || t.status === 'Fechado').length,
-        slaViolated: tickets.filter(t => t.sla_violated).length,
-        byStatus: {},
-        byPriority: {},
-        byDepartment: {},
-        byTechnician: {},
-        slaViolations: [],
-        topIssues: {},
-        resolutionTimes: []
-    };
+function updateKeyMetrics(stats) {
+    document.getElementById('metric-total-tickets').textContent = stats.total_tickets;
     
-    // Calculate resolution rate
-    analytics.resolutionRate = analytics.total > 0 ? 
-        ((analytics.resolved / analytics.total) * 100).toFixed(1) : 0;
+    const resolutionRate = stats.total_tickets > 0 ? 
+        Math.round(((stats.resolved_tickets + stats.closed_tickets) / stats.total_tickets) * 100) : 0;
+    document.getElementById('metric-resolution-rate').textContent = resolutionRate + '%';
     
-    // Calculate SLA compliance
-    analytics.slaCompliance = analytics.total > 0 ? 
-        (((analytics.total - analytics.slaViolated) / analytics.total) * 100).toFixed(1) : 100;
+    const slaCompliance = stats.total_tickets > 0 ? 
+        Math.round(((stats.total_tickets - stats.sla_violations) / stats.total_tickets) * 100) : 100;
+    document.getElementById('metric-sla-compliance').textContent = slaCompliance + '%';
     
-    // Group by status
-    tickets.forEach(ticket => {
-        analytics.byStatus[ticket.status] = (analytics.byStatus[ticket.status] || 0) + 1;
-        analytics.byPriority[ticket.priority] = (analytics.byPriority[ticket.priority] || 0) + 1;
-        analytics.byDepartment[ticket.department] = (analytics.byDepartment[ticket.department] || 0) + 1;
-        
-        if (ticket.assigned_to) {
-            const techName = ticket.assigned_to.name;
-            analytics.byTechnician[techName] = (analytics.byTechnician[techName] || 0) + 1;
-        }
-        
-        // SLA violations
-        if (ticket.sla_violated) {
-            analytics.slaViolations.push({
-                id: ticket.id,
-                title: ticket.title,
-                priority: ticket.priority,
-                exceeded_time: calculateExceededTime(ticket)
-            });
-        }
-        
-        // Resolution times
-        if (ticket.resolved_at) {
-            const created = new Date(ticket.created_at);
-            const resolved = new Date(ticket.resolved_at);
-            const hours = (resolved - created) / (1000 * 60 * 60);
-            analytics.resolutionTimes.push(hours);
-        }
-        
-        // Top issues (by keywords in title)
-        const keywords = ticket.title.toLowerCase().split(' ').filter(word => word.length > 3);
-        keywords.forEach(keyword => {
-            analytics.topIssues[keyword] = (analytics.topIssues[keyword] || 0) + 1;
-        });
-    });
+    document.getElementById('metric-sla-violations').textContent = stats.sla_violations;
+}
+
+function generateCharts(tickets) {
+    generatePriorityChart(tickets);
+    generateStatusChart(tickets);
+    generateDepartmentChart(tickets);
+    generateMonthlyTrendChart(tickets);
+}
+
+function generatePriorityChart(tickets) {
+    const priorityCounts = tickets.reduce((acc, ticket) => {
+        acc[ticket.priority] = (acc[ticket.priority] || 0) + 1;
+        return acc;
+    }, {});
     
-    // Calculate average resolution time
-    if (analytics.resolutionTimes.length > 0) {
-        const avgHours = analytics.resolutionTimes.reduce((a, b) => a + b, 0) / analytics.resolutionTimes.length;
-        analytics.avgResolutionTime = formatHours(avgHours);
-    } else {
-        analytics.avgResolutionTime = 'N/A';
+    const ctx = document.getElementById('priority-chart').getContext('2d');
+    
+    if (charts.priority) {
+        charts.priority.destroy();
     }
     
-    return analytics;
-}
-
-// Calculate exceeded time for SLA violations
-function calculateExceededTime(ticket) {
-    if (!ticket.sla_deadline) return 'N/A';
-    
-    const deadline = new Date(ticket.sla_deadline);
-    const now = ticket.resolved_at ? new Date(ticket.resolved_at) : new Date();
-    const exceeded = (now - deadline) / (1000 * 60 * 60); // hours
-    
-    return exceeded > 0 ? formatHours(exceeded) : '0h';
-}
-
-// Format hours to human readable
-function formatHours(hours) {
-    if (hours < 1) {
-        return `${Math.round(hours * 60)}m`;
-    } else if (hours < 24) {
-        return `${Math.round(hours * 10) / 10}h`;
-    } else {
-        const days = Math.floor(hours / 24);
-        const remainingHours = Math.round(hours % 24);
-        return `${days}d ${remainingHours}h`;
-    }
-}
-
-// Update metrics display
-function updateMetrics(analytics) {
-    document.getElementById('metric-total').textContent = analytics.total;
-    document.getElementById('metric-resolution-rate').textContent = `${analytics.resolutionRate}%`;
-    document.getElementById('metric-avg-time').textContent = analytics.avgResolutionTime;
-    document.getElementById('metric-sla-compliance').textContent = `${analytics.slaCompliance}%`;
-}
-
-// Update all charts
-function updateCharts(analytics) {
-    updateStatusTrendChart(analytics);
-    updateDepartmentChart(analytics);
-    updatePriorityDistributionChart(analytics);
-    updateTechnicianPerformanceChart(analytics);
-}
-
-// Status trend chart
-function updateStatusTrendChart(analytics) {
-    const ctx = document.getElementById('statusTrendChart').getContext('2d');
-    
-    if (charts.statusTrend) {
-        charts.statusTrend.destroy();
-    }
-    
-    charts.statusTrend = new Chart(ctx, {
-        type: 'line',
+    charts.priority = new Chart(ctx, {
+        type: 'pie',
         data: {
-            labels: ['Aberto', 'Em Andamento', 'Resolvido', 'Fechado'],
+            labels: Object.keys(priorityCounts),
             datasets: [{
-                label: 'Número de Chamados',
-                data: [
-                    analytics.byStatus['Aberto'] || 0,
-                    analytics.byStatus['Em Andamento'] || 0,
-                    analytics.byStatus['Resolvido'] || 0,
-                    analytics.byStatus['Fechado'] || 0
-                ],
-                borderColor: '#0ea5e9',
-                backgroundColor: 'rgba(14, 165, 233, 0.1)',
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Department chart
-function updateDepartmentChart(analytics) {
-    const ctx = document.getElementById('departmentChart').getContext('2d');
-    
-    if (charts.department) {
-        charts.department.destroy();
-    }
-    
-    const departments = Object.keys(analytics.byDepartment);
-    const counts = Object.values(analytics.byDepartment);
-    
-    charts.department = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: departments,
-            datasets: [{
-                data: counts,
+                data: Object.values(priorityCounts),
                 backgroundColor: [
-                    '#0ea5e9', '#14b8a6', '#d946ef', '#f59e0b',
-                    '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'
-                ]
+                    'rgba(239, 68, 68, 0.8)',   // Red for Alta
+                    'rgba(245, 158, 11, 0.8)',  // Yellow for Média
+                    'rgba(34, 197, 94, 0.8)'    // Green for Baixa
+                ],
+                borderWidth: 2,
+                borderColor: '#ffffff'
             }]
         },
         options: {
@@ -441,26 +343,32 @@ function updateDepartmentChart(analytics) {
     });
 }
 
-// Priority distribution chart
-function updatePriorityDistributionChart(analytics) {
-    const ctx = document.getElementById('priorityDistributionChart').getContext('2d');
+function generateStatusChart(tickets) {
+    const statusCounts = tickets.reduce((acc, ticket) => {
+        acc[ticket.status] = (acc[ticket.status] || 0) + 1;
+        return acc;
+    }, {});
     
-    if (charts.priority) {
-        charts.priority.destroy();
+    const ctx = document.getElementById('status-chart').getContext('2d');
+    
+    if (charts.status) {
+        charts.status.destroy();
     }
     
-    charts.priority = new Chart(ctx, {
-        type: 'bar',
+    charts.status = new Chart(ctx, {
+        type: 'doughnut',
         data: {
-            labels: ['Alta', 'Média', 'Baixa'],
+            labels: Object.keys(statusCounts),
             datasets: [{
-                label: 'Chamados',
-                data: [
-                    analytics.byPriority['Alta'] || 0,
-                    analytics.byPriority['Média'] || 0,
-                    analytics.byPriority['Baixa'] || 0
+                data: Object.values(statusCounts),
+                backgroundColor: [
+                    'rgba(59, 130, 246, 0.8)',   // Blue for Aberto
+                    'rgba(245, 158, 11, 0.8)',   // Orange for Em Andamento
+                    'rgba(34, 197, 94, 0.8)',    // Green for Resolvido
+                    'rgba(107, 114, 128, 0.8)'   // Gray for Fechado
                 ],
-                backgroundColor: ['#ef4444', '#f59e0b', '#22c55e']
+                borderWidth: 2,
+                borderColor: '#ffffff'
             }]
         },
         options: {
@@ -468,9 +376,113 @@ function updatePriorityDistributionChart(analytics) {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    display: false
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function generateDepartmentChart(tickets) {
+    const departmentCounts = tickets.reduce((acc, ticket) => {
+        acc[ticket.department] = (acc[ticket.department] || 0) + 1;
+        return acc;
+    }, {});
+    
+    const ctx = document.getElementById('department-chart').getContext('2d');
+    
+    if (charts.department) {
+        charts.department.destroy();
+    }
+    
+    charts.department = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(departmentCounts),
+            datasets: [{
+                label: 'Chamados',
+                data: Object.values(departmentCounts),
+                backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                borderColor: 'rgba(16, 185, 129, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
                 }
             },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function generateMonthlyTrendChart(tickets) {
+    // Group tickets by month
+    const monthlyData = tickets.reduce((acc, ticket) => {
+        const date = new Date(ticket.created_at);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (!acc[monthKey]) {
+            acc[monthKey] = { created: 0, resolved: 0 };
+        }
+        
+        acc[monthKey].created++;
+        
+        if (ticket.status === 'Resolvido' || ticket.status === 'Fechado') {
+            acc[monthKey].resolved++;
+        }
+        
+        return acc;
+    }, {});
+    
+    const sortedMonths = Object.keys(monthlyData).sort();
+    const createdData = sortedMonths.map(month => monthlyData[month].created);
+    const resolvedData = sortedMonths.map(month => monthlyData[month].resolved);
+    
+    const ctx = document.getElementById('monthly-trend-chart').getContext('2d');
+    
+    if (charts.monthly) {
+        charts.monthly.destroy();
+    }
+    
+    charts.monthly = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: sortedMonths.map(month => {
+                const [year, monthNum] = month.split('-');
+                const date = new Date(year, monthNum - 1);
+                return date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+            }),
+            datasets: [{
+                label: 'Criados',
+                data: createdData,
+                borderColor: 'rgba(59, 130, 246, 1)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'Resolvidos',
+                data: resolvedData,
+                borderColor: 'rgba(34, 197, 94, 1)',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
                 y: {
                     beginAtZero: true,
@@ -483,148 +495,181 @@ function updatePriorityDistributionChart(analytics) {
     });
 }
 
-// Technician performance chart
-function updateTechnicianPerformanceChart(analytics) {
-    const ctx = document.getElementById('technicianPerformanceChart').getContext('2d');
-    
-    if (charts.technician) {
-        charts.technician.destroy();
-    }
-    
-    const technicians = Object.keys(analytics.byTechnician).slice(0, 10); // Top 10
-    const counts = technicians.map(tech => analytics.byTechnician[tech]);
-    
-    charts.technician = new Chart(ctx, {
-        type: 'horizontalBar',
-        data: {
-            labels: technicians,
-            datasets: [{
-                label: 'Chamados Atendidos',
-                data: counts,
-                backgroundColor: '#14b8a6'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
-                    }
-                }
-            }
-        }
-    });
+function generateTables(tickets) {
+    generateTechniciansTable(tickets);
+    generateDepartmentsTable(tickets);
 }
 
-// Update SLA violations table
-function updateSLAViolationsTable(violations) {
-    const tbody = document.getElementById('sla-violations-table');
+function generateTechniciansTable(tickets) {
+    // Calculate technician performance
+    const techPerformance = tickets.reduce((acc, ticket) => {
+        if (ticket.assigned_to) {
+            const techId = ticket.assigned_to.id;
+            const techName = ticket.assigned_to.username;
+            
+            if (!acc[techId]) {
+                acc[techId] = {
+                    name: techName,
+                    total: 0,
+                    resolved: 0,
+                    slaViolations: 0
+                };
+            }
+            
+            acc[techId].total++;
+            
+            if (ticket.status === 'Resolvido' || ticket.status === 'Fechado') {
+                acc[techId].resolved++;
+            }
+            
+            if (ticket.sla_violated) {
+                acc[techId].slaViolations++;
+            }
+        }
+        
+        return acc;
+    }, {});
     
-    if (violations.length === 0) {
+    const sortedTechs = Object.values(techPerformance)
+        .sort((a, b) => b.resolved - a.resolved);
+    
+    const tbody = document.getElementById('technicians-table');
+    
+    if (sortedTechs.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="3" class="px-6 py-4 text-center text-gray-500">
-                    Nenhuma violação de SLA encontrada
+                <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                    Nenhum dado de técnico disponível
                 </td>
             </tr>
         `;
         return;
     }
     
-    tbody.innerHTML = violations.slice(0, 5).map(violation => `
-        <tr>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-gray-900">#${violation.id}</div>
-                <div class="text-sm text-gray-500 max-w-xs truncate">${violation.title}</div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityClasses(violation.priority)}">
-                    ${violation.priority}
-                </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
-                ${violation.exceeded_time}
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = sortedTechs.map(tech => {
+        const slaCompliance = tech.total > 0 ? 
+            Math.round(((tech.total - tech.slaViolations) / tech.total) * 100) : 100;
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-4 text-sm text-gray-900">${tech.name}</td>
+                <td class="px-4 py-4 text-sm text-gray-900">${tech.resolved}</td>
+                <td class="px-4 py-4 text-sm">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${slaCompliance >= 90 ? 'bg-green-100 text-green-800' : slaCompliance >= 70 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
+                        ${slaCompliance}%
+                    </span>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
-// Update top issues table
-function updateTopIssuesTable(issues) {
-    const container = document.getElementById('top-issues-list');
+function generateDepartmentsTable(tickets) {
+    // Calculate department statistics
+    const deptStats = tickets.reduce((acc, ticket) => {
+        const dept = ticket.department;
+        
+        if (!acc[dept]) {
+            acc[dept] = {
+                total: 0,
+                totalTime: 0,
+                resolvedCount: 0
+            };
+        }
+        
+        acc[dept].total++;
+        
+        if (ticket.resolved_at) {
+            const createdTime = new Date(ticket.created_at);
+            const resolvedTime = new Date(ticket.resolved_at);
+            const diffHours = (resolvedTime - createdTime) / (1000 * 60 * 60);
+            
+            acc[dept].totalTime += diffHours;
+            acc[dept].resolvedCount++;
+        }
+        
+        return acc;
+    }, {});
     
-    const topIssues = Object.entries(issues)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 5);
+    const tbody = document.getElementById('departments-table');
     
-    if (topIssues.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-sm">Nenhum problema identificado</p>';
+    if (Object.keys(deptStats).length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                    Nenhum dado de departamento disponível
+                </td>
+            </tr>
+        `;
         return;
     }
     
-    container.innerHTML = topIssues.map(([issue, count]) => `
-        <div class="flex justify-between items-center">
-            <span class="text-sm text-gray-900 capitalize">${issue}</span>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                ${count} ${count === 1 ? 'ocorrência' : 'ocorrências'}
-            </span>
-        </div>
-    `).join('');
+    tbody.innerHTML = Object.entries(deptStats).map(([dept, stats]) => {
+        const avgTime = stats.resolvedCount > 0 ? 
+            Math.round(stats.totalTime / stats.resolvedCount) : 0;
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-4 text-sm text-gray-900">${dept}</td>
+                <td class="px-4 py-4 text-sm text-gray-900">${stats.total}</td>
+                <td class="px-4 py-4 text-sm text-gray-900">${avgTime}h</td>
+            </tr>
+        `;
+    }).join('');
 }
 
-// Export tickets to CSV
-async function exportTicketsCSV() {
+function applyReportFilters() {
+    currentFilters = {
+        start_date: document.getElementById('filter-start-date').value,
+        end_date: document.getElementById('filter-end-date').value,
+        status: document.getElementById('filter-status').value,
+        priority: document.getElementById('filter-priority').value,
+        department: document.getElementById('filter-department').value
+    };
+    
+    loadReportData();
+}
+
+function clearReportFilters() {
+    document.getElementById('filter-start-date').value = '';
+    document.getElementById('filter-end-date').value = '';
+    document.getElementById('filter-status').value = '';
+    document.getElementById('filter-priority').value = '';
+    document.getElementById('filter-department').value = '';
+    
+    currentFilters = {};
+    initializeDateFilters();
+    loadReportData();
+}
+
+async function exportReport() {
     try {
-        showLoading(true);
+        showLoading();
         
         const params = new URLSearchParams(currentFilters);
-        window.open(`/api/reports/tickets?${params}`, '_blank');
+        
+        const response = await axios.get(`/api/reports/export?${params}`, {
+            responseType: 'blob'
+        });
+        
+        // Create download link
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `relatorio_chamados_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
         
         showToast('Relatório exportado com sucesso!', 'success');
         
     } catch (error) {
+        console.error('Error exporting report:', error);
         showToast('Erro ao exportar relatório', 'error');
     } finally {
-        showLoading(false);
+        hideLoading();
     }
 }
-
-// Event listeners
-document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication and permissions
-    const currentUser = getCurrentUser();
-    if (!currentUser || !['Administrador', 'Diretoria'].includes(currentUser.role)) {
-        showToast('Acesso negado. Apenas administradores e diretoria podem acessar esta página.', 'error');
-        window.location.href = '/dashboard';
-        return;
-    }
-    
-    // Initialize
-    initializeDateFilters();
-    loadReportsData();
-    
-    // Event handlers
-    document.getElementById('apply-filters').addEventListener('click', loadReportsData);
-    document.getElementById('refresh-data-btn').addEventListener('click', loadReportsData);
-    document.getElementById('export-tickets-btn').addEventListener('click', exportTicketsCSV);
-    
-    // Auto-refresh every 5 minutes
-    setInterval(loadReportsData, 5 * 60 * 1000);
-});
-
-// Cleanup charts on page unload
-window.addEventListener('beforeunload', function() {
-    Object.values(charts).forEach(chart => {
-        if (chart) chart.destroy();
-    });
-});
 </script>
 {% endblock %}

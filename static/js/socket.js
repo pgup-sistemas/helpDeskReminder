@@ -1,4 +1,4 @@
-// Socket.IO client management for real-time features
+// TechSupport Pro - Socket.IO Client Implementation
 
 class SocketManager {
     constructor() {
@@ -6,360 +6,234 @@ class SocketManager {
         this.isConnected = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
-        this.reconnectDelay = 3000;
-        this.currentTicketRoom = null;
-        this.eventHandlers = new Map();
+        this.reconnectDelay = 1000;
+        this.pingInterval = null;
+        this.currentRoom = null;
+        this.eventListeners = new Map();
         
-        this.initialize();
+        this.init();
     }
     
-    initialize() {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            console.warn('No token found, cannot initialize socket connection');
+    init() {
+        if (typeof io === 'undefined') {
+            console.warn('Socket.IO not loaded, real-time features disabled');
             return;
         }
         
         this.connect();
+        this.setupEventListeners();
     }
     
     connect() {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            console.error('Cannot connect socket without authentication token');
-            return;
-        }
-        
         try {
             this.socket = io({
-                auth: {
-                    token: token
-                },
                 transports: ['websocket', 'polling'],
-                timeout: 10000,
-                forceNew: true
+                timeout: 20000,
+                reconnection: true,
+                reconnectionDelay: this.reconnectDelay,
+                reconnectionAttempts: this.maxReconnectAttempts
             });
             
-            this.setupEventListeners();
+            this.socket.on('connect', () => this.onConnect());
+            this.socket.on('disconnect', (reason) => this.onDisconnect(reason));
+            this.socket.on('connect_error', (error) => this.onConnectError(error));
+            this.socket.on('reconnect', (attemptNumber) => this.onReconnect(attemptNumber));
+            this.socket.on('reconnect_failed', () => this.onReconnectFailed());
             
         } catch (error) {
             console.error('Failed to initialize socket connection:', error);
-            this.handleConnectionError();
         }
+    }
+    
+    onConnect() {
+        console.log('Socket connected successfully');
+        this.isConnected = true;
+        this.reconnectAttempts = 0;
+        
+        // Start ping interval to keep connection alive
+        this.startPing();
+        
+        // Show connection status
+        this.showConnectionStatus('connected');
+        
+        // Emit custom connect event
+        this.emit('socket_connected');
+    }
+    
+    onDisconnect(reason) {
+        console.log('Socket disconnected:', reason);
+        this.isConnected = false;
+        this.currentRoom = null;
+        
+        // Stop ping interval
+        this.stopPing();
+        
+        // Show disconnection status
+        this.showConnectionStatus('disconnected');
+        
+        // Emit custom disconnect event
+        this.emit('socket_disconnected', reason);
+    }
+    
+    onConnectError(error) {
+        console.error('Socket connection error:', error);
+        this.reconnectAttempts++;
+        
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            this.showConnectionStatus('failed');
+            window.TechSupport?.showToast('Falha na conexão em tempo real. Alguns recursos podem não funcionar.', 'warning');
+        }
+    }
+    
+    onReconnect(attemptNumber) {
+        console.log(`Socket reconnected after ${attemptNumber} attempts`);
+        this.reconnectAttempts = 0;
+        window.TechSupport?.showToast('Conexão em tempo real restaurada!', 'success');
+    }
+    
+    onReconnectFailed() {
+        console.error('Socket reconnection failed');
+        this.showConnectionStatus('failed');
+        window.TechSupport?.showToast('Não foi possível restabelecer a conexão em tempo real.', 'error');
     }
     
     setupEventListeners() {
         if (!this.socket) return;
         
-        // Connection events
-        this.socket.on('connect', () => {
-            console.log('Socket connected successfully');
-            this.isConnected = true;
-            this.reconnectAttempts = 0;
-            this.updateConnectionStatus(true);
+        // Handle new tickets
+        this.socket.on('new_ticket', (data) => {
+            console.log('New ticket received:', data);
+            this.emit('new_ticket', data);
             
-            // Rejoin ticket room if we were in one
-            if (this.currentTicketRoom) {
-                this.joinTicketRoom(this.currentTicketRoom);
+            // Show notification for technicians
+            if (window.location.pathname.includes('/dashboard') || window.location.pathname.includes('/tickets')) {
+                window.TechSupport?.showToast(`Novo chamado: ${data.title}`, 'info');
             }
         });
         
-        this.socket.on('disconnect', (reason) => {
-            console.log('Socket disconnected:', reason);
-            this.isConnected = false;
-            this.updateConnectionStatus(false);
+        // Handle ticket updates
+        this.socket.on('ticket_updated', (data) => {
+            console.log('Ticket updated:', data);
+            this.emit('ticket_updated', data);
+        });
+        
+        // Handle new messages
+        this.socket.on('new_message', (data) => {
+            console.log('New message received:', data);
+            this.emit('new_message', data);
             
-            // Attempt reconnection for certain disconnect reasons
-            if (reason === 'io server disconnect') {
-                // Server initiated disconnect, don't reconnect automatically
-                console.log('Server disconnected client, not attempting reconnection');
-            } else {
-                // Client or network issue, attempt reconnection
-                this.handleReconnection();
-            }
+            // Play notification sound (if enabled)
+            this.playNotificationSound();
         });
         
-        this.socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-            this.handleConnectionError();
-        });
-        
-        // Application events
-        this.socket.on('connected', (data) => {
-            console.log('Socket authentication successful:', data.message);
-        });
-        
-        this.socket.on('error', (data) => {
-            console.error('Socket error:', data.message);
-            showToast('Erro de conexão em tempo real', 'error');
-        });
-        
-        // Ticket events
-        this.socket.on('new_ticket', (ticket) => {
-            this.handleNewTicket(ticket);
-        });
-        
-        this.socket.on('ticket_updated', (ticket) => {
-            this.handleTicketUpdate(ticket);
-        });
-        
-        this.socket.on('new_message', (message) => {
-            this.handleNewMessage(message);
-        });
-        
-        this.socket.on('message_notification', (data) => {
-            this.handleMessageNotification(data);
-        });
-        
-        // Chat events
+        // Handle typing indicators
         this.socket.on('user_typing', (data) => {
-            this.handleUserTyping(data);
+            this.emit('user_typing', data);
         });
         
+        // Handle user joining/leaving ticket rooms
         this.socket.on('joined_ticket', (data) => {
-            console.log(`Joined ticket room: ${data.room}`);
+            console.log('User joined ticket room:', data);
+            this.emit('user_joined_ticket', data);
         });
         
         this.socket.on('left_ticket', (data) => {
-            console.log(`Left ticket room: ${data.room}`);
+            console.log('User left ticket room:', data);
+            this.emit('user_left_ticket', data);
+        });
+        
+        // Handle pong response
+        this.socket.on('pong', () => {
+            console.log('Pong received');
         });
     }
     
-    handleConnectionError() {
-        this.isConnected = false;
-        this.updateConnectionStatus(false);
-        
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            setTimeout(() => {
-                this.handleReconnection();
-            }, this.reconnectDelay * Math.pow(2, this.reconnectAttempts)); // Exponential backoff
-        } else {
-            console.error('Max reconnection attempts reached');
-            showToast('Conexão em tempo real perdida. Recarregue a página.', 'error');
-        }
-    }
-    
-    handleReconnection() {
-        if (this.isConnected) return;
-        
-        this.reconnectAttempts++;
-        console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-        
-        // Check if we still have a valid token
-        const token = localStorage.getItem('token');
-        if (!token) {
-            console.log('No token available for reconnection');
-            return;
-        }
-        
-        try {
-            this.socket.disconnect();
-            this.connect();
-        } catch (error) {
-            console.error('Reconnection failed:', error);
-            this.handleConnectionError();
-        }
-    }
-    
-    updateConnectionStatus(connected) {
-        const statusIndicator = document.getElementById('connection-status');
-        if (statusIndicator) {
-            if (connected) {
-                statusIndicator.className = 'w-2 h-2 bg-green-400 rounded-full';
-                statusIndicator.title = 'Conectado em tempo real';
-            } else {
-                statusIndicator.className = 'w-2 h-2 bg-red-400 rounded-full animate-pulse';
-                statusIndicator.title = 'Desconectado - tentando reconectar...';
-            }
-        }
-    }
-    
-    // Event handlers
-    handleNewTicket(ticket) {
-        const currentUser = getCurrentUser();
-        
-        // Only show notification to technicians and admins
-        if (currentUser && ['Técnico', 'Administrador'].includes(currentUser.role)) {
-            showToast(`Novo chamado #${ticket.id}: ${ticket.title}`, 'info');
-            
-            // Play notification sound if available
-            this.playNotificationSound();
-            
-            // Update tickets list if we're on the tickets page
-            if (window.location.pathname === '/tickets' && typeof loadTickets === 'function') {
-                loadTickets();
-            }
-            
-            // Update dashboard if we're on the dashboard
-            if (window.location.pathname === '/dashboard' && typeof loadDashboardData === 'function') {
-                loadDashboardData();
-            }
-        }
-        
-        // Trigger custom event handlers
-        this.triggerCustomEvent('newTicket', ticket);
-    }
-    
-    handleTicketUpdate(ticket) {
-        // Update ticket detail view if we're viewing this ticket
-        const currentTicketId = this.getCurrentTicketId();
-        if (currentTicketId && currentTicketId == ticket.id) {
-            if (typeof renderTicketDetails === 'function') {
-                renderTicketDetails(ticket);
-            }
-        }
-        
-        // Update tickets list
-        if (window.location.pathname === '/tickets' && typeof loadTickets === 'function') {
-            loadTickets();
-        }
-        
-        // Update dashboard
-        if (window.location.pathname === '/dashboard' && typeof loadDashboardData === 'function') {
-            loadDashboardData();
-        }
-        
-        // Trigger custom event handlers
-        this.triggerCustomEvent('ticketUpdate', ticket);
-    }
-    
-    handleNewMessage(message) {
-        // Update messages in ticket detail view
-        const currentTicketId = this.getCurrentTicketId();
-        if (currentTicketId && currentTicketId == message.ticket_id) {
-            if (typeof loadMessages === 'function') {
-                loadMessages();
-            }
-            
-            // Play notification sound for new messages
-            this.playNotificationSound();
-        }
-        
-        // Trigger custom event handlers
-        this.triggerCustomEvent('newMessage', message);
-    }
-    
-    handleMessageNotification(data) {
-        // Show toast notification for message in other tickets
-        const currentTicketId = this.getCurrentTicketId();
-        if (!currentTicketId || currentTicketId != data.ticket_id) {
-            const messageType = data.is_internal ? 'Mensagem interna' : 'Nova mensagem';
-            showToast(`${messageType} no chamado #${data.ticket_id}`, 'info');
-        }
-        
-        // Trigger custom event handlers
-        this.triggerCustomEvent('messageNotification', data);
-    }
-    
-    handleUserTyping(data) {
-        const currentTicketId = this.getCurrentTicketId();
-        if (currentTicketId && currentTicketId == data.ticket_id) {
-            const indicator = document.getElementById('typing-indicator');
-            if (indicator) {
-                const span = indicator.querySelector('span');
-                if (span) {
-                    if (data.is_typing) {
-                        span.textContent = `${data.user_name} está digitando...`;
-                        indicator.classList.remove('hidden');
-                    } else {
-                        indicator.classList.add('hidden');
-                    }
-                }
-            }
-        }
-        
-        // Trigger custom event handlers
-        this.triggerCustomEvent('userTyping', data);
-    }
-    
-    // Public methods
+    // Room management
     joinTicketRoom(ticketId) {
-        if (!this.socket || !this.isConnected) {
-            console.warn('Cannot join ticket room: socket not connected');
-            return;
-        }
-        
-        // Leave current room if any
-        if (this.currentTicketRoom && this.currentTicketRoom !== ticketId) {
-            this.leaveTicketRoom();
-        }
+        if (!this.isConnected || !ticketId) return;
         
         this.socket.emit('join_ticket', { ticket_id: ticketId });
-        this.currentTicketRoom = ticketId;
+        this.currentRoom = `ticket_${ticketId}`;
+        console.log(`Joined ticket room: ${this.currentRoom}`);
     }
     
-    leaveTicketRoom() {
-        if (!this.socket || !this.currentTicketRoom) return;
+    leaveTicketRoom(ticketId) {
+        if (!this.isConnected || !ticketId) return;
         
-        this.socket.emit('leave_ticket', { ticket_id: this.currentTicketRoom });
-        this.currentTicketRoom = null;
-    }
-    
-    sendMessage(ticketId, message, isInternal = false) {
-        if (!this.socket || !this.isConnected) {
-            console.warn('Cannot send message: socket not connected');
-            return;
+        this.socket.emit('leave_ticket', { ticket_id: ticketId });
+        
+        if (this.currentRoom === `ticket_${ticketId}`) {
+            this.currentRoom = null;
         }
         
-        this.socket.emit('send_message', {
-            ticket_id: ticketId,
-            message: message,
-            is_internal: isInternal
-        });
+        console.log(`Left ticket room: ticket_${ticketId}`);
     }
     
+    // Typing indicators
     sendTypingIndicator(ticketId, isTyping = true) {
-        if (!this.socket || !this.isConnected) return;
-        
-        const currentUser = getCurrentUser();
-        if (!currentUser) return;
+        if (!this.isConnected || !ticketId) return;
         
         this.socket.emit('typing', {
             ticket_id: ticketId,
-            user_name: currentUser.name,
             is_typing: isTyping
         });
     }
     
-    // Custom event system
-    on(eventName, handler) {
-        if (!this.eventHandlers.has(eventName)) {
-            this.eventHandlers.set(eventName, []);
-        }
-        this.eventHandlers.get(eventName).push(handler);
-    }
-    
-    off(eventName, handler) {
-        if (this.eventHandlers.has(eventName)) {
-            const handlers = this.eventHandlers.get(eventName);
-            const index = handlers.indexOf(handler);
-            if (index > -1) {
-                handlers.splice(index, 1);
+    // Ping functionality
+    startPing() {
+        this.stopPing(); // Clear any existing interval
+        
+        this.pingInterval = setInterval(() => {
+            if (this.isConnected) {
+                this.socket.emit('ping');
             }
+        }, 30000); // Ping every 30 seconds
+    }
+    
+    stopPing() {
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = null;
         }
     }
     
-    triggerCustomEvent(eventName, data) {
-        if (this.eventHandlers.has(eventName)) {
-            this.eventHandlers.get(eventName).forEach(handler => {
-                try {
-                    handler(data);
-                } catch (error) {
-                    console.error(`Error in custom event handler for ${eventName}:`, error);
-                }
-            });
-        }
+    // Connection status indicator
+    showConnectionStatus(status) {
+        const indicator = document.getElementById('connection-status');
+        if (!indicator) return;
+        
+        const statusMap = {
+            connected: {
+                icon: 'fas fa-wifi text-green-500',
+                text: 'Conectado',
+                class: 'bg-green-100 text-green-800'
+            },
+            disconnected: {
+                icon: 'fas fa-wifi text-yellow-500',
+                text: 'Reconectando...',
+                class: 'bg-yellow-100 text-yellow-800'
+            },
+            failed: {
+                icon: 'fas fa-wifi text-red-500',
+                text: 'Desconectado',
+                class: 'bg-red-100 text-red-800'
+            }
+        };
+        
+        const config = statusMap[status] || statusMap.disconnected;
+        
+        indicator.innerHTML = `
+            <i class="${config.icon} mr-1"></i>
+            <span class="text-xs">${config.text}</span>
+        `;
+        
+        indicator.className = `px-2 py-1 rounded-full ${config.class}`;
     }
     
-    // Utility methods
-    getCurrentTicketId() {
-        const match = window.location.pathname.match(/\/ticket\/(\d+)/);
-        return match ? parseInt(match[1]) : null;
-    }
-    
+    // Notification sound
     playNotificationSound() {
         try {
-            // Create a simple beep sound using Web Audio API
+            // Create and play a subtle notification sound
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
@@ -370,63 +244,217 @@ class SocketManager {
             oscillator.frequency.value = 800;
             oscillator.type = 'sine';
             
-            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
             
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.3);
+            
         } catch (error) {
-            console.log('Could not play notification sound:', error);
+            console.log('Notification sound not available');
         }
+    }
+    
+    // Event system
+    on(event, callback) {
+        if (!this.eventListeners.has(event)) {
+            this.eventListeners.set(event, []);
+        }
+        this.eventListeners.get(event).push(callback);
+    }
+    
+    off(event, callback) {
+        if (!this.eventListeners.has(event)) return;
+        
+        const listeners = this.eventListeners.get(event);
+        const index = listeners.indexOf(callback);
+        if (index > -1) {
+            listeners.splice(index, 1);
+        }
+    }
+    
+    emit(event, data = null) {
+        if (!this.eventListeners.has(event)) return;
+        
+        const listeners = this.eventListeners.get(event);
+        listeners.forEach(callback => {
+            try {
+                callback(data);
+            } catch (error) {
+                console.error(`Error in socket event listener for ${event}:`, error);
+            }
+        });
+    }
+    
+    // Public methods
+    isSocketConnected() {
+        return this.isConnected;
+    }
+    
+    getCurrentRoom() {
+        return this.currentRoom;
     }
     
     disconnect() {
         if (this.socket) {
-            this.leaveTicketRoom();
+            this.stopPing();
             this.socket.disconnect();
             this.socket = null;
             this.isConnected = false;
-            this.currentTicketRoom = null;
+            this.currentRoom = null;
         }
     }
     
-    // Getters
-    get connected() {
-        return this.isConnected;
-    }
-    
-    get reconnecting() {
-        return !this.isConnected && this.reconnectAttempts > 0;
+    // Send custom events
+    sendCustomEvent(eventName, data) {
+        if (this.isConnected) {
+            this.socket.emit(eventName, data);
+        }
     }
 }
 
-// Global socket manager instance
+// Initialize socket manager when DOM is ready
 let socketManager = null;
 
-// Initialize socket manager
-function initializeSocket() {
-    if (!socketManager) {
+document.addEventListener('DOMContentLoaded', function() {
+    // Only initialize if user is logged in (check for navigation presence)
+    if (document.querySelector('nav')) {
         socketManager = new SocketManager();
+        
+        // Make socket manager globally available
+        window.SocketManager = socketManager;
+        
+        console.log('Socket manager initialized');
     }
-    return socketManager;
-}
+});
 
-// Cleanup socket on page unload
-window.addEventListener('beforeunload', () => {
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
     if (socketManager) {
         socketManager.disconnect();
     }
 });
 
-// Auto-initialize if user is authenticated
-document.addEventListener('DOMContentLoaded', () => {
-    const token = localStorage.getItem('token');
-    if (token && window.location.pathname !== '/login') {
-        initializeSocket();
+// Page-specific socket handlers
+function setupTicketDetailSocketHandlers(ticketId) {
+    if (!socketManager) return;
+    
+    // Join ticket room
+    socketManager.joinTicketRoom(ticketId);
+    
+    // Handle new messages
+    socketManager.on('new_message', function(data) {
+        if (data.ticket_id === ticketId) {
+            // Reload messages or append new message to chat
+            if (typeof loadMessages === 'function') {
+                loadMessages();
+            }
+        }
+    });
+    
+    // Handle ticket updates
+    socketManager.on('ticket_updated', function(data) {
+        if (data.ticket_id === ticketId) {
+            // Reload ticket details
+            if (typeof loadTicketDetails === 'function') {
+                loadTicketDetails();
+            }
+            
+            window.TechSupport?.showToast(`Chamado atualizado por ${data.updated_by}`, 'info');
+        }
+    });
+    
+    // Handle typing indicators
+    socketManager.on('user_typing', function(data) {
+        if (data.ticket_id === ticketId) {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) {
+                if (data.is_typing) {
+                    indicator.innerHTML = `<i class="fas fa-circle-notch fa-spin mr-1"></i>${data.username} está digitando...`;
+                    indicator.classList.remove('hidden');
+                } else {
+                    indicator.classList.add('hidden');
+                }
+            }
+        }
+    });
+    
+    // Setup typing detection for message input
+    const messageInput = document.getElementById('message-input');
+    if (messageInput) {
+        let typingTimeout = null;
+        
+        messageInput.addEventListener('input', function() {
+            socketManager.sendTypingIndicator(ticketId, true);
+            
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socketManager.sendTypingIndicator(ticketId, false);
+            }, 1000);
+        });
+        
+        // Stop typing when user leaves input
+        messageInput.addEventListener('blur', function() {
+            clearTimeout(typingTimeout);
+            socketManager.sendTypingIndicator(ticketId, false);
+        });
     }
-});
+    
+    // Cleanup when leaving page
+    window.addEventListener('beforeunload', function() {
+        if (socketManager) {
+            socketManager.leaveTicketRoom(ticketId);
+        }
+    });
+}
+
+function setupDashboardSocketHandlers() {
+    if (!socketManager) return;
+    
+    // Handle new tickets
+    socketManager.on('new_ticket', function(data) {
+        // Refresh dashboard stats
+        if (typeof loadDashboardStats === 'function') {
+            loadDashboardStats();
+        }
+        
+        // Show notification
+        window.TechSupport?.showToast(`Novo chamado: ${data.title}`, 'info');
+    });
+    
+    // Handle ticket updates
+    socketManager.on('ticket_updated', function(data) {
+        // Refresh dashboard stats
+        if (typeof loadDashboardStats === 'function') {
+            loadDashboardStats();
+        }
+    });
+}
+
+function setupTicketsListSocketHandlers() {
+    if (!socketManager) return;
+    
+    // Handle new tickets
+    socketManager.on('new_ticket', function(data) {
+        // Refresh tickets list
+        if (typeof loadTickets === 'function') {
+            loadTickets(1); // Reload first page
+        }
+    });
+    
+    // Handle ticket updates
+    socketManager.on('ticket_updated', function(data) {
+        // Refresh tickets list
+        if (typeof refreshTickets === 'function') {
+            refreshTickets();
+        }
+    });
+}
 
 // Export for use in other scripts
-window.SocketManager = SocketManager;
-window.initializeSocket = initializeSocket;
-window.getSocketManager = () => socketManager;
+window.setupTicketDetailSocketHandlers = setupTicketDetailSocketHandlers;
+window.setupDashboardSocketHandlers = setupDashboardSocketHandlers;
+window.setupTicketsListSocketHandlers = setupTicketsListSocketHandlers;
+
+console.log('TechSupport Pro socket.js loaded successfully');

@@ -1,73 +1,30 @@
-
-import enum
-from datetime import datetime, timedelta
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import UserMixin
 from app import db
+from datetime import datetime, timedelta
+from sqlalchemy import event
 
-class UserRole(enum.Enum):
-    ADMINISTRADOR = 'administrador'
-    DIRETORIA = 'diretoria'
-    TECNICO = 'tecnico'
-    COLABORADOR = 'colaborador'
-
-class TicketStatus(enum.Enum):
-    ABERTO = 'aberto'
-    EM_ANDAMENTO = 'em_andamento'
-    AGUARDANDO = 'aguardando'
-    RESOLVIDO = 'resolvido'
-    FECHADO = 'fechado'
-
-class TicketPriority(enum.Enum):
-    BAIXA = 'baixa'
-    MEDIA = 'media'
-    ALTA = 'alta'
-    CRITICA = 'critica'
-
-class User(UserMixin, db.Model):
+class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.COLABORADOR)
-    department = db.Column(db.String(100))
+    role = db.Column(db.String(20), nullable=False)  # Colaborador, Técnico, Administrador, Diretoria
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    is_active = db.Column(db.Boolean, default=True)
+    active = db.Column(db.Boolean, default=True)
     
     # Relationships
-    created_tickets = db.relationship('Ticket', foreign_keys='Ticket.requester_id', backref='requester', lazy='dynamic')
-    assigned_tickets = db.relationship('Ticket', foreign_keys='Ticket.assigned_to_id', backref='assigned_technician', lazy='dynamic')
-    messages = db.relationship('ChatMessage', backref='author', lazy='dynamic')
-    
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-    
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'username': self.username,
-            'email': self.email,
-            'role': self.role.value,
-            'department': self.department,
-            'created_at': self.created_at.isoformat(),
-            'is_active': self.is_active
-        }
+    created_tickets = db.relationship('Ticket', foreign_keys='Ticket.creator_id', backref='creator', lazy='dynamic')
+    assigned_tickets = db.relationship('Ticket', foreign_keys='Ticket.assigned_to', backref='assignee', lazy='dynamic')
+    messages = db.relationship('Message', backref='author', lazy='dynamic')
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
-    status = db.Column(db.Enum(TicketStatus), nullable=False, default=TicketStatus.ABERTO)
-    priority = db.Column(db.Enum(TicketPriority), nullable=False, default=TicketPriority.MEDIA)
     department = db.Column(db.String(100), nullable=False)
+    priority = db.Column(db.String(10), nullable=False)  # Alta, Média, Baixa
+    status = db.Column(db.String(20), default='Aberto')  # Aberto, Em Andamento, Resolvido, Fechado
     observations = db.Column(db.Text)
-    
-    # Foreign keys
-    requester_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    assigned_to_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -76,108 +33,61 @@ class Ticket(db.Model):
     closed_at = db.Column(db.DateTime)
     
     # SLA tracking
-    sla_deadline = db.Column(db.DateTime)
+    sla_due = db.Column(db.DateTime)
     sla_violated = db.Column(db.Boolean, default=False)
     
+    # Foreign keys
+    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    assigned_to = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
     # Relationships
-    messages = db.relationship('ChatMessage', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
-    attachments = db.relationship('TicketAttachment', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
-    
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.set_sla_deadline()
-    
-    def set_sla_deadline(self):
-        if self.priority == TicketPriority.CRITICA:
-            hours = 2
-        elif self.priority == TicketPriority.ALTA:
-            hours = 4
-        elif self.priority == TicketPriority.MEDIA:
-            hours = 8
-        else:  # BAIXA
-            hours = 24
-        
-        self.sla_deadline = self.created_at + timedelta(hours=hours)
-    
-    def check_sla_violation(self):
-        if not self.sla_violated and datetime.utcnow() > self.sla_deadline:
-            if self.status not in [TicketStatus.RESOLVIDO, TicketStatus.FECHADO]:
-                self.sla_violated = True
-                db.session.commit()
-    
-    def time_until_sla(self):
-        if self.sla_deadline:
-            delta = self.sla_deadline - datetime.utcnow()
-            return delta.total_seconds()
-        return None
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'title': self.title,
-            'description': self.description,
-            'status': self.status.value,
-            'priority': self.priority.value,
-            'department': self.department,
-            'observations': self.observations,
-            'requester': self.requester.username if self.requester else None,
-            'assigned_to': self.assigned_technician.username if self.assigned_technician else None,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
-            'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
-            'closed_at': self.closed_at.isoformat() if self.closed_at else None,
-            'sla_deadline': self.sla_deadline.isoformat() if self.sla_deadline else None,
-            'sla_violated': self.sla_violated,
-            'time_until_sla': self.time_until_sla()
-        }
+    messages = db.relationship('Message', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
+    attachments = db.relationship('Attachment', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
 
-class ChatMessage(db.Model):
+class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
-    message_type = db.Column(db.String(20), default='message')  # message, system, attachment
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    message_type = db.Column(db.String(20), default='message')  # message, status_update, system
     
     # Foreign keys
     ticket_id = db.Column(db.Integer, db.ForeignKey('ticket.id'), nullable=False)
-    author_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
-    # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'content': self.content,
-            'message_type': self.message_type,
-            'author': self.author.username,
-            'author_role': self.author.role.value,
-            'created_at': self.created_at.isoformat(),
-            'ticket_id': self.ticket_id
-        }
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
-class TicketAttachment(db.Model):
+class Attachment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
     original_filename = db.Column(db.String(255), nullable=False)
-    file_size = db.Column(db.Integer)
-    mime_type = db.Column(db.String(100))
+    file_size = db.Column(db.Integer, nullable=False)
+    mime_type = db.Column(db.String(100), nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Foreign keys
     ticket_id = db.Column(db.Integer, db.ForeignKey('ticket.id'), nullable=False)
-    uploaded_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
-    # Timestamps
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     
     # Relationships
-    uploaded_by = db.relationship('User', backref='uploaded_attachments')
+    uploader = db.relationship('User', backref='uploaded_files')
+
+# Event listeners for SLA calculation
+@event.listens_for(Ticket, 'before_insert')
+def calculate_sla_on_insert(mapper, connection, target):
+    """Calculate SLA due date when ticket is created"""
+    if target.priority == 'Alta':
+        target.sla_due = target.created_at + timedelta(hours=4)
+    elif target.priority == 'Média':
+        target.sla_due = target.created_at + timedelta(hours=8)
+    else:  # Baixa
+        target.sla_due = target.created_at + timedelta(hours=24)
+
+@event.listens_for(Ticket, 'before_update')
+def update_timestamps_on_update(mapper, connection, target):
+    """Update timestamps when ticket status changes"""
+    if target.status == 'Resolvido' and not target.resolved_at:
+        target.resolved_at = datetime.utcnow()
+    elif target.status == 'Fechado' and not target.closed_at:
+        target.closed_at = datetime.utcnow()
     
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'filename': self.filename,
-            'original_filename': self.original_filename,
-            'file_size': self.file_size,
-            'mime_type': self.mime_type,
-            'uploaded_by': self.uploaded_by.username,
-            'uploaded_at': self.uploaded_at.isoformat()
-        }
+    # Check SLA violation
+    if target.status not in ['Resolvido', 'Fechado'] and target.sla_due:
+        target.sla_violated = datetime.utcnow() > target.sla_due

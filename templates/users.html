@@ -1,135 +1,170 @@
 {% extends "base.html" %}
 
-{% block title %}Usuários - Sistema de Chamados TI{% endblock %}
+{% block title %}Usuários - TechSupport Pro{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Gerenciamento de Usuários</h1>
-            <p class="mt-1 text-sm text-gray-600">
-                Administre usuários e suas permissões
-            </p>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                <i class="fas fa-users text-tech-primary mr-3"></i>Gerenciamento de Usuários
+            </h1>
+            <p class="text-gray-600">Administre contas de usuário e permissões do sistema.</p>
         </div>
-        <button 
-            type="button" 
-            id="new-user-btn"
-            class="btn-primary"
-        >
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-            </svg>
-            Novo Usuário
+        
+        <button onclick="openNewUserModal()" class="bg-tech-primary hover:bg-tech-secondary text-white px-6 py-3 rounded-lg transition-colors font-medium">
+            <i class="fas fa-user-plus mr-2"></i>Novo Usuário
         </button>
     </div>
 
-    <!-- Users Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="stat-card">
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-lg p-6">
             <div class="flex items-center">
-                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                    </svg>
+                <div class="p-3 rounded-full bg-blue-100">
+                    <i class="fas fa-users text-blue-600 text-xl"></i>
                 </div>
-                <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-600">Total</p>
-                    <p class="text-lg font-bold text-gray-900" id="total-users">0</p>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Total de Usuários</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="total-users">-</p>
                 </div>
             </div>
         </div>
-
-        <div class="stat-card">
+        
+        <div class="bg-white rounded-xl shadow-lg p-6">
             <div class="flex items-center">
-                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
+                <div class="p-3 rounded-full bg-green-100">
+                    <i class="fas fa-user-check text-green-600 text-xl"></i>
                 </div>
-                <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-600">Ativos</p>
-                    <p class="text-lg font-bold text-gray-900" id="active-users">0</p>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Usuários Ativos</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="active-users">-</p>
                 </div>
             </div>
         </div>
-
-        <div class="stat-card">
+        
+        <div class="bg-white rounded-xl shadow-lg p-6">
             <div class="flex items-center">
-                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    </svg>
+                <div class="p-3 rounded-full bg-purple-100">
+                    <i class="fas fa-user-cog text-purple-600 text-xl"></i>
                 </div>
-                <div class="ml-3">
+                <div class="ml-4">
                     <p class="text-sm font-medium text-gray-600">Técnicos</p>
-                    <p class="text-lg font-bold text-gray-900" id="technician-users">0</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="technician-users">-</p>
                 </div>
             </div>
         </div>
-
-        <div class="stat-card">
+        
+        <div class="bg-white rounded-xl shadow-lg p-6">
             <div class="flex items-center">
-                <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2-2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                    </svg>
+                <div class="p-3 rounded-full bg-orange-100">
+                    <i class="fas fa-user-tie text-orange-600 text-xl"></i>
                 </div>
-                <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-600">Admins</p>
-                    <p class="text-lg font-bold text-gray-900" id="admin-users">0</p>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Administradores</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="admin-users">-</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Users Table -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="text-lg font-semibold">Lista de Usuários</h3>
-            <div class="flex items-center space-x-4">
-                <div class="relative">
-                    <input 
-                        type="text" 
-                        id="search-users" 
-                        placeholder="Buscar usuários..." 
-                        class="form-input pl-10 pr-4 py-2 text-sm w-64"
-                    >
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <select id="filter-role" class="form-select text-sm">
-                    <option value="">Todas as funções</option>
-                    <option value="administrador">Administrador</option>
-                    <option value="tecnico">Técnico</option>
-                    <option value="colaborador">Colaborador</option>
-                    <option value="diretoria">Diretoria</option>
+    <!-- Filters -->
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-filter text-tech-accent mr-2"></i>Filtros
+        </h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Função</label>
+                <select id="filter-role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
+                    <option value="">Todas</option>
+                    <option value="Colaborador">Colaborador</option>
+                    <option value="Técnico">Técnico</option>
+                    <option value="Administrador">Administrador</option>
+                    <option value="Diretoria">Diretoria</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+                <select id="filter-department" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
+                    <option value="">Todos</option>
+                    <option value="TI">TI</option>
+                    <option value="RH">RH</option>
+                    <option value="Vendas">Vendas</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Financeiro">Financeiro</option>
+                    <option value="Diretoria">Diretoria</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select id="filter-status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
+                    <option value="">Todos</option>
+                    <option value="active">Ativo</option>
+                    <option value="inactive">Inativo</option>
                 </select>
             </div>
         </div>
         
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
+        <div class="flex justify-between items-center mt-4">
+            <button onclick="clearUserFilters()" class="text-gray-600 hover:text-gray-800 transition-colors">
+                <i class="fas fa-times-circle mr-1"></i>Limpar Filtros
+            </button>
+            <button onclick="applyUserFilters()" class="bg-tech-accent hover:bg-tech-accent-dark text-white px-4 py-2 rounded-lg transition-colors">
+                <i class="fas fa-search mr-2"></i>Aplicar Filtros
+            </button>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="bg-white rounded-xl shadow-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-900">Lista de Usuários</h3>
+                <button onclick="refreshUsers()" class="text-tech-primary hover:text-tech-secondary transition-colors">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
                     <tr>
-                        <th>Usuário</th>
-                        <th>Email</th>
-                        <th>Função</th>
-                        <th>Departamento</th>
-                        <th>Status</th>
-                        <th>Criado em</th>
-                        <th>Ações</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Usuário
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Email
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Função
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Departamento
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Criado em
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Ações
+                        </th>
                     </tr>
                 </thead>
-                <tbody id="users-tbody">
+                <tbody id="users-table-body" class="bg-white divide-y divide-gray-200">
                     <tr>
-                        <td colspan="7" class="text-center py-8">
-                            <div class="loading-spinner mx-auto"></div>
-                            <p class="text-gray-500 mt-2">Carregando usuários...</p>
+                        <td colspan="7" class="px-6 py-12 text-center">
+                            <div class="flex justify-center items-center">
+                                <i class="fas fa-spinner fa-spin text-tech-primary text-2xl mr-3"></i>
+                                <span class="text-gray-600">Carregando usuários...</span>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
@@ -139,123 +174,163 @@
 </div>
 
 <!-- New User Modal -->
-<div id="new-user-modal" class="modal-overlay hidden">
-    <div class="modal-content max-w-lg">
-        <div class="modal-header">
-            <h3 class="text-lg font-semibold">Novo Usuário</h3>
+<div id="new-user-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-user-plus text-tech-primary mr-2"></i>Novo Usuário
+            </h3>
+            <button onclick="closeNewUserModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-xl"></i>
+            </button>
         </div>
+        
         <form id="new-user-form">
-            <div class="modal-body space-y-4">
+            <div class="space-y-4">
                 <div>
-                    <label class="form-label">Nome de Usuário *</label>
-                    <input type="text" id="user-username" class="form-input" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nome de Usuário</label>
+                    <input type="text" id="user-username" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                 </div>
-
+                
                 <div>
-                    <label class="form-label">Email *</label>
-                    <input type="email" id="user-email" class="form-input" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="user-email" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                 </div>
-
+                
                 <div>
-                    <label class="form-label">Senha *</label>
-                    <input type="password" id="user-password" class="form-input" required minlength="6">
-                    <p class="text-xs text-gray-500 mt-1">Mínimo 6 caracteres</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                    <input type="password" id="user-password" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="form-label">Função *</label>
-                        <select id="user-role" class="form-select" required>
-                            <option value="">Selecione...</option>
-                            <option value="colaborador">Colaborador</option>
-                            <option value="tecnico">Técnico</option>
-                            <option value="administrador">Administrador</option>
-                            <option value="diretoria">Diretoria</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="form-label">Departamento</label>
-                        <select id="user-department" class="form-select">
-                            <option value="">Selecione...</option>
-                            <option value="TI">TI</option>
-                            <option value="Vendas">Vendas</option>
-                            <option value="Marketing">Marketing</option>
-                            <option value="RH">RH</option>
-                            <option value="Financeiro">Financeiro</option>
-                            <option value="Diretoria">Diretoria</option>
-                        </select>
-                    </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Função</label>
+                    <select id="user-role" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
+                        <option value="">Selecione uma função</option>
+                        <option value="Colaborador">Colaborador</option>
+                        <option value="Técnico">Técnico</option>
+                        <option value="Administrador">Administrador</option>
+                        <option value="Diretoria">Diretoria</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+                    <select id="user-department" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
+                        <option value="">Selecione um departamento</option>
+                        <option value="TI">TI</option>
+                        <option value="RH">RH</option>
+                        <option value="Vendas">Vendas</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Financeiro">Financeiro</option>
+                        <option value="Diretoria">Diretoria</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="user-active" checked 
+                               class="rounded border-gray-300 text-tech-accent focus:ring-tech-accent">
+                        <span class="ml-2 text-sm text-gray-700">Usuário ativo</span>
+                    </label>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn-primary">Criar Usuário</button>
+            
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" onclick="closeNewUserModal()" 
+                        class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        class="px-6 py-2 bg-tech-primary hover:bg-tech-secondary text-white rounded-lg transition-colors">
+                    <i class="fas fa-plus mr-2"></i>Criar Usuário
+                </button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- Edit User Modal -->
-<div id="edit-user-modal" class="modal-overlay hidden">
-    <div class="modal-content max-w-lg">
-        <div class="modal-header">
-            <h3 class="text-lg font-semibold">Editar Usuário</h3>
+<div id="edit-user-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-user-edit text-tech-primary mr-2"></i>Editar Usuário
+            </h3>
+            <button onclick="closeEditUserModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-xl"></i>
+            </button>
         </div>
+        
         <form id="edit-user-form">
             <input type="hidden" id="edit-user-id">
-            <div class="modal-body space-y-4">
+            <div class="space-y-4">
                 <div>
-                    <label class="form-label">Nome de Usuário *</label>
-                    <input type="text" id="edit-username" class="form-input" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nome de Usuário</label>
+                    <input type="text" id="edit-user-username" readonly 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
+                    <p class="text-xs text-gray-500 mt-1">O nome de usuário não pode ser alterado</p>
                 </div>
-
+                
                 <div>
-                    <label class="form-label">Email *</label>
-                    <input type="email" id="edit-email" class="form-input" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="edit-user-email" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                 </div>
-
+                
                 <div>
-                    <label class="form-label">Nova Senha</label>
-                    <input type="password" id="edit-password" class="form-input" minlength="6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
+                    <input type="password" id="edit-user-password" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                     <p class="text-xs text-gray-500 mt-1">Deixe em branco para manter a senha atual</p>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="form-label">Função *</label>
-                        <select id="edit-role" class="form-select" required>
-                            <option value="colaborador">Colaborador</option>
-                            <option value="tecnico">Técnico</option>
-                            <option value="administrador">Administrador</option>
-                            <option value="diretoria">Diretoria</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="form-label">Departamento</label>
-                        <select id="edit-department" class="form-select">
-                            <option value="">Selecione...</option>
-                            <option value="TI">TI</option>
-                            <option value="Vendas">Vendas</option>
-                            <option value="Marketing">Marketing</option>
-                            <option value="RH">RH</option>
-                            <option value="Financeiro">Financeiro</option>
-                            <option value="Diretoria">Diretoria</option>
-                        </select>
-                    </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Função</label>
+                    <select id="edit-user-role" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
+                        <option value="Colaborador">Colaborador</option>
+                        <option value="Técnico">Técnico</option>
+                        <option value="Administrador">Administrador</option>
+                        <option value="Diretoria">Diretoria</option>
+                    </select>
                 </div>
-
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+                    <select id="edit-user-department" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
+                        <option value="TI">TI</option>
+                        <option value="RH">RH</option>
+                        <option value="Vendas">Vendas</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Financeiro">Financeiro</option>
+                        <option value="Diretoria">Diretoria</option>
+                    </select>
+                </div>
+                
                 <div>
                     <label class="flex items-center">
-                        <input type="checkbox" id="edit-is-active" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                        <input type="checkbox" id="edit-user-active" 
+                               class="rounded border-gray-300 text-tech-accent focus:ring-tech-accent">
                         <span class="ml-2 text-sm text-gray-700">Usuário ativo</span>
                     </label>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn-primary">Atualizar Usuário</button>
+            
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" onclick="closeEditUserModal()" 
+                        class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        class="px-6 py-2 bg-tech-primary hover:bg-tech-secondary text-white rounded-lg transition-colors">
+                    <i class="fas fa-save mr-2"></i>Salvar Alterações
+                </button>
             </div>
         </form>
     </div>
@@ -264,347 +339,281 @@
 
 {% block scripts %}
 <script>
-    // Redirect if not authenticated or not admin
-    if (!localStorage.getItem('token')) {
-        window.location.href = '/';
+let currentUsers = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadUsers();
+    setupUserForms();
+});
+
+async function loadUsers() {
+    try {
+        showLoading();
+        
+        const response = await axios.get('/api/users');
+        currentUsers = response.data.users;
+        
+        renderUsersTable(currentUsers);
+        updateUserStats(currentUsers);
+        
+    } catch (error) {
+        console.error('Error loading users:', error);
+        showToast('Erro ao carregar usuários', 'error');
+    } finally {
+        hideLoading();
     }
+}
 
-    class UsersManager {
-        constructor() {
-            this.users = [];
-            this.filteredUsers = [];
-            this.init();
-        }
-
-        async init() {
-            // Check if user has admin role
-            const user = window.helpDeskApp.user;
-            if (!user || user.role !== 'administrador') {
-                window.helpDeskApp.showAlert('Acesso negado. Apenas administradores podem acessar esta página.', 'error');
-                window.location.href = '/dashboard';
-                return;
-            }
-
-            await this.loadUsers();
-            this.setupEventListeners();
-            this.updateStats();
-        }
-
-        async loadUsers() {
-            try {
-                const response = await axios.get('/api/users');
-                this.users = response.data;
-                this.filteredUsers = [...this.users];
-                this.renderUsers();
-                this.updateStats();
-            } catch (error) {
-                console.error('Failed to load users:', error);
-                this.showError('Erro ao carregar usuários');
-            }
-        }
-
-        renderUsers() {
-            const tbody = document.getElementById('users-tbody');
-            
-            if (this.filteredUsers.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="7" class="text-center py-8">
-                            <div class="text-gray-500">
-                                <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                                </svg>
-                                <p>Nenhum usuário encontrado</p>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            tbody.innerHTML = this.filteredUsers.map(user => `
-                <tr class="hover:bg-gray-50">
-                    <td>
-                        <div class="flex items-center">
-                            <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center mr-3">
-                                <span class="text-primary-600 font-medium text-sm">
-                                    ${user.username.charAt(0).toUpperCase()}
-                                </span>
-                            </div>
-                            <div>
-                                <p class="font-medium text-sm">${user.username}</p>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="text-sm text-gray-600">${user.email}</td>
-                    <td>
-                        <span class="role-badge role-${user.role}">
-                            ${this.formatRole(user.role)}
-                        </span>
-                    </td>
-                    <td class="text-sm">${user.department || '-'}</td>
-                    <td>
-                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
-                            user.is_active 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                        }">
-                            ${user.is_active ? 'Ativo' : 'Inativo'}
-                        </span>
-                    </td>
-                    <td class="text-sm">${window.helpDeskApp.formatRelativeTime(user.created_at)}</td>
-                    <td>
-                        <div class="flex space-x-2">
-                            <button 
-                                type="button" 
-                                class="text-primary-600 hover:text-primary-700 text-xs font-medium"
-                                onclick="usersManager.editUser(${user.id})"
-                            >
-                                Editar
-                            </button>
-                            <button 
-                                type="button" 
-                                class="text-${user.is_active ? 'red' : 'green'}-600 hover:text-${user.is_active ? 'red' : 'green'}-700 text-xs font-medium"
-                                onclick="usersManager.toggleUserStatus(${user.id})"
-                            >
-                                ${user.is_active ? 'Desativar' : 'Ativar'}
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        updateStats() {
-            const total = this.users.length;
-            const active = this.users.filter(u => u.is_active).length;
-            const technicians = this.users.filter(u => u.role === 'tecnico').length;
-            const admins = this.users.filter(u => u.role === 'administrador').length;
-
-            document.getElementById('total-users').textContent = total;
-            document.getElementById('active-users').textContent = active;
-            document.getElementById('technician-users').textContent = technicians;
-            document.getElementById('admin-users').textContent = admins;
-        }
-
-        setupEventListeners() {
-            // New user button
-            document.getElementById('new-user-btn').addEventListener('click', () => {
-                this.showNewUserModal();
-            });
-
-            // Forms
-            document.getElementById('new-user-form').addEventListener('submit', (e) => {
-                this.handleNewUserSubmit(e);
-            });
-
-            document.getElementById('edit-user-form').addEventListener('submit', (e) => {
-                this.handleEditUserSubmit(e);
-            });
-
-            // Search and filter
-            document.getElementById('search-users').addEventListener('input', (e) => {
-                this.filterUsers();
-            });
-
-            document.getElementById('filter-role').addEventListener('change', (e) => {
-                this.filterUsers();
-            });
-        }
-
-        filterUsers() {
-            const searchTerm = document.getElementById('search-users').value.toLowerCase();
-            const roleFilter = document.getElementById('filter-role').value;
-
-            this.filteredUsers = this.users.filter(user => {
-                const matchesSearch = user.username.toLowerCase().includes(searchTerm) ||
-                                    user.email.toLowerCase().includes(searchTerm) ||
-                                    (user.department || '').toLowerCase().includes(searchTerm);
-                
-                const matchesRole = !roleFilter || user.role === roleFilter;
-
-                return matchesSearch && matchesRole;
-            });
-
-            this.renderUsers();
-        }
-
-        showNewUserModal() {
-            document.getElementById('new-user-modal').classList.remove('hidden');
-            document.getElementById('user-username').focus();
-        }
-
-        async handleNewUserSubmit(e) {
-            e.preventDefault();
-            
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            const formData = {
-                username: document.getElementById('user-username').value,
-                email: document.getElementById('user-email').value,
-                password: document.getElementById('user-password').value,
-                role: document.getElementById('user-role').value,
-                department: document.getElementById('user-department').value
-            };
-
-            try {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<div class="loading-spinner mr-2"></div>Criando...';
-
-                await axios.post('/api/users', formData);
-                
-                window.helpDeskApp.showAlert('Usuário criado com sucesso!', 'success');
-                window.helpDeskApp.closeModal();
-                this.resetNewUserForm();
-                this.loadUsers();
-
-            } catch (error) {
-                console.error('Failed to create user:', error);
-                window.helpDeskApp.showAlert(
-                    error.response?.data?.message || 'Erro ao criar usuário',
-                    'error'
-                );
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = 'Criar Usuário';
-            }
-        }
-
-        editUser(userId) {
-            const user = this.users.find(u => u.id === userId);
-            if (!user) return;
-
-            // Populate form
-            document.getElementById('edit-user-id').value = user.id;
-            document.getElementById('edit-username').value = user.username;
-            document.getElementById('edit-email').value = user.email;
-            document.getElementById('edit-password').value = '';
-            document.getElementById('edit-role').value = user.role;
-            document.getElementById('edit-department').value = user.department || '';
-            document.getElementById('edit-is-active').checked = user.is_active;
-
-            document.getElementById('edit-user-modal').classList.remove('hidden');
-        }
-
-        async handleEditUserSubmit(e) {
-            e.preventDefault();
-            
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            const userId = document.getElementById('edit-user-id').value;
-            const formData = {
-                username: document.getElementById('edit-username').value,
-                email: document.getElementById('edit-email').value,
-                role: document.getElementById('edit-role').value,
-                department: document.getElementById('edit-department').value,
-                is_active: document.getElementById('edit-is-active').checked
-            };
-
-            const password = document.getElementById('edit-password').value;
-            if (password) {
-                formData.password = password;
-            }
-
-            try {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<div class="loading-spinner mr-2"></div>Atualizando...';
-
-                await axios.put(`/api/users/${userId}`, formData);
-                
-                window.helpDeskApp.showAlert('Usuário atualizado com sucesso!', 'success');
-                window.helpDeskApp.closeModal();
-                this.loadUsers();
-
-            } catch (error) {
-                console.error('Failed to update user:', error);
-                window.helpDeskApp.showAlert(
-                    error.response?.data?.message || 'Erro ao atualizar usuário',
-                    'error'
-                );
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = 'Atualizar Usuário';
-            }
-        }
-
-        async toggleUserStatus(userId) {
-            const user = this.users.find(u => u.id === userId);
-            if (!user) return;
-
-            const action = user.is_active ? 'desativar' : 'ativar';
-            const confirmed = confirm(`Deseja ${action} o usuário ${user.username}?`);
-            if (!confirmed) return;
-
-            try {
-                await axios.put(`/api/users/${userId}`, {
-                    is_active: !user.is_active
-                });
-                
-                window.helpDeskApp.showAlert(
-                    `Usuário ${user.is_active ? 'desativado' : 'ativado'} com sucesso!`, 
-                    'success'
-                );
-                this.loadUsers();
-
-            } catch (error) {
-                console.error('Failed to toggle user status:', error);
-                window.helpDeskApp.showAlert('Erro ao alterar status do usuário', 'error');
-            }
-        }
-
-        resetNewUserForm() {
-            document.getElementById('new-user-form').reset();
-        }
-
-        formatRole(role) {
-            const roleMap = {
-                'colaborador': 'Colaborador',
-                'tecnico': 'Técnico',
-                'administrador': 'Administrador',
-                'diretoria': 'Diretoria'
-            };
-            return roleMap[role] || role;
-        }
-
-        showError(message) {
-            const tbody = document.getElementById('users-tbody');
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="text-center py-8">
-                        <div class="text-red-500">
-                            <svg class="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                            </svg>
-                            <p>${message}</p>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }
+function renderUsersTable(users) {
+    const tbody = document.getElementById('users-table-body');
+    
+    if (users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="px-6 py-12 text-center">
+                    <div class="text-gray-500">
+                        <i class="fas fa-users text-4xl mb-4 opacity-50"></i>
+                        <p class="text-lg font-medium">Nenhum usuário encontrado</p>
+                        <p class="text-sm">Tente ajustar os filtros ou criar um novo usuário.</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
     }
+    
+    tbody.innerHTML = users.map(user => {
+        const roleClass = getRoleClass(user.role);
+        const statusClass = user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+        
+        return `
+            <tr class="hover:bg-gray-50 transition-colors">
+                <td class="px-6 py-4">
+                    <div class="flex items-center">
+                        <div class="h-10 w-10 rounded-full bg-tech-accent flex items-center justify-center">
+                            <i class="fas fa-user text-white"></i>
+                        </div>
+                        <div class="ml-4">
+                            <div class="text-sm font-medium text-gray-900">${user.username}</div>
+                            <div class="text-sm text-gray-500">#${user.id}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="text-sm text-gray-900">${user.email}</div>
+                </td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${roleClass}">
+                        ${user.role}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-900">${user.department}</td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                        ${user.is_active ? 'Ativo' : 'Inativo'}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500">
+                    ${formatDateTime(user.created_at)}
+                </td>
+                <td class="px-6 py-4 text-sm font-medium space-x-2">
+                    <button onclick="editUser(${user.id})" class="text-tech-primary hover:text-tech-secondary">
+                        <i class="fas fa-edit mr-1"></i>Editar
+                    </button>
+                    <button onclick="deleteUser(${user.id}, '${user.username}')" class="text-red-600 hover:text-red-800">
+                        <i class="fas fa-trash mr-1"></i>Excluir
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
 
-    // Initialize users manager
-    const usersManager = new UsersManager();
-    window.usersManager = usersManager;
+function getRoleClass(role) {
+    const classes = {
+        'Colaborador': 'bg-blue-100 text-blue-800',
+        'Técnico': 'bg-purple-100 text-purple-800',
+        'Administrador': 'bg-orange-100 text-orange-800',
+        'Diretoria': 'bg-red-100 text-red-800'
+    };
+    return classes[role] || 'bg-gray-100 text-gray-800';
+}
+
+function updateUserStats(users) {
+    const total = users.length;
+    const active = users.filter(u => u.is_active).length;
+    const technicians = users.filter(u => u.role === 'Técnico').length;
+    const admins = users.filter(u => u.role === 'Administrador').length;
+    
+    document.getElementById('total-users').textContent = total;
+    document.getElementById('active-users').textContent = active;
+    document.getElementById('technician-users').textContent = technicians;
+    document.getElementById('admin-users').textContent = admins;
+}
+
+function applyUserFilters() {
+    const roleFilter = document.getElementById('filter-role').value;
+    const departmentFilter = document.getElementById('filter-department').value;
+    const statusFilter = document.getElementById('filter-status').value;
+    
+    let filteredUsers = currentUsers;
+    
+    if (roleFilter) {
+        filteredUsers = filteredUsers.filter(u => u.role === roleFilter);
+    }
+    
+    if (departmentFilter) {
+        filteredUsers = filteredUsers.filter(u => u.department === departmentFilter);
+    }
+    
+    if (statusFilter) {
+        const isActive = statusFilter === 'active';
+        filteredUsers = filteredUsers.filter(u => u.is_active === isActive);
+    }
+    
+    renderUsersTable(filteredUsers);
+}
+
+function clearUserFilters() {
+    document.getElementById('filter-role').value = '';
+    document.getElementById('filter-department').value = '';
+    document.getElementById('filter-status').value = '';
+    
+    renderUsersTable(currentUsers);
+}
+
+function refreshUsers() {
+    loadUsers();
+}
+
+function setupUserForms() {
+    // New user form
+    document.getElementById('new-user-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            username: document.getElementById('user-username').value,
+            email: document.getElementById('user-email').value,
+            password: document.getElementById('user-password').value,
+            role: document.getElementById('user-role').value,
+            department: document.getElementById('user-department').value,
+            is_active: document.getElementById('user-active').checked
+        };
+        
+        try {
+            showLoading();
+            
+            await axios.post('/api/users', formData);
+            
+            showToast('Usuário criado com sucesso!', 'success');
+            closeNewUserModal();
+            loadUsers();
+            
+        } catch (error) {
+            console.error('Error creating user:', error);
+            const message = error.response?.data?.error || 'Erro ao criar usuário';
+            showToast(message, 'error');
+        } finally {
+            hideLoading();
+        }
+    });
+    
+    // Edit user form
+    document.getElementById('edit-user-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const userId = document.getElementById('edit-user-id').value;
+        const formData = {
+            email: document.getElementById('edit-user-email').value,
+            role: document.getElementById('edit-user-role').value,
+            department: document.getElementById('edit-user-department').value,
+            is_active: document.getElementById('edit-user-active').checked
+        };
+        
+        const password = document.getElementById('edit-user-password').value;
+        if (password) {
+            formData.password = password;
+        }
+        
+        try {
+            showLoading();
+            
+            await axios.put(`/api/users/${userId}`, formData);
+            
+            showToast('Usuário atualizado com sucesso!', 'success');
+            closeEditUserModal();
+            loadUsers();
+            
+        } catch (error) {
+            console.error('Error updating user:', error);
+            const message = error.response?.data?.error || 'Erro ao atualizar usuário';
+            showToast(message, 'error');
+        } finally {
+            hideLoading();
+        }
+    });
+}
+
+function openNewUserModal() {
+    document.getElementById('new-user-modal').classList.remove('hidden');
+}
+
+function closeNewUserModal() {
+    document.getElementById('new-user-modal').classList.add('hidden');
+    document.getElementById('new-user-form').reset();
+    document.getElementById('user-active').checked = true;
+}
+
+function editUser(userId) {
+    const user = currentUsers.find(u => u.id === userId);
+    if (!user) return;
+    
+    document.getElementById('edit-user-id').value = user.id;
+    document.getElementById('edit-user-username').value = user.username;
+    document.getElementById('edit-user-email').value = user.email;
+    document.getElementById('edit-user-role').value = user.role;
+    document.getElementById('edit-user-department').value = user.department;
+    document.getElementById('edit-user-active').checked = user.is_active;
+    document.getElementById('edit-user-password').value = '';
+    
+    document.getElementById('edit-user-modal').classList.remove('hidden');
+}
+
+function closeEditUserModal() {
+    document.getElementById('edit-user-modal').classList.add('hidden');
+}
+
+async function deleteUser(userId, username) {
+    if (!confirm(`Tem certeza que deseja excluir o usuário "${username}"? Esta ação não pode ser desfeita.`)) {
+        return;
+    }
+    
+    try {
+        showLoading();
+        
+        await axios.delete(`/api/users/${userId}`);
+        
+        showToast('Usuário excluído com sucesso!', 'success');
+        loadUsers();
+        
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        const message = error.response?.data?.error || 'Erro ao excluir usuário';
+        showToast(message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function formatDateTime(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
 </script>
-
-<style>
-    .role-badge {
-        @apply px-2 py-1 text-xs font-medium rounded-full;
-    }
-    
-    .role-administrador {
-        @apply bg-red-100 text-red-800;
-    }
-    
-    .role-tecnico {
-        @apply bg-blue-100 text-blue-800;
-    }
-    
-    .role-colaborador {
-        @apply bg-green-100 text-green-800;
-    }
-    
-    .role-diretoria {
-        @apply bg-purple-100 text-purple-800;
-    }
-</style>
 {% endblock %}

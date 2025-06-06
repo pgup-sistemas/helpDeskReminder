@@ -1,146 +1,97 @@
+from datetime import datetime, timedelta
+from models import Ticket
 import os
-from werkzeug.utils import secure_filename
-from models import User, UserRole, db
 
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx'}
+def get_sla_hours(priority):
+    """Get SLA hours based on priority"""
+    sla_map = {
+        'Alta': 4,
+        'Média': 8,
+        'Baixa': 24
+    }
+    return sla_map.get(priority, 24)
+
+def calculate_sla_status(ticket):
+    """Calculate SLA status for a ticket"""
+    if ticket.status in ['Resolvido', 'Fechado']:
+        return 'completed'
+    
+    if not ticket.sla_due:
+        return 'ok'
+    
+    now = datetime.utcnow()
+    time_left = ticket.sla_due - now
+    
+    if time_left.total_seconds() < 0:
+        return 'violated'
+    elif time_left.total_seconds() < 3600:  # Less than 1 hour
+        return 'warning'
+    else:
+        return 'ok'
+
+def format_time_remaining(sla_due):
+    """Format time remaining until SLA violation"""
+    if not sla_due:
+        return None
+    
+    now = datetime.utcnow()
+    time_left = sla_due - now
+    
+    if time_left.total_seconds() < 0:
+        return "Vencido"
+    
+    days = time_left.days
+    hours, remainder = divmod(time_left.seconds, 3600)
+    minutes, _ = divmod(remainder, 60)
+    
+    if days > 0:
+        return f"{days}d {hours}h {minutes}m"
+    elif hours > 0:
+        return f"{hours}h {minutes}m"
+    else:
+        return f"{minutes}m"
 
 def allowed_file(filename):
+    """Check if file extension is allowed"""
+    ALLOWED_EXTENSIONS = {
+        'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 
+        'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'rar', '7z'
+    }
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def create_demo_users():
-    """Create demo users if they don't exist"""
-    demo_users = [
-        {
-            'username': 'admin',
-            'email': 'admin@helpdesk.com',
-            'password': 'admin123',
-            'role': UserRole.ADMINISTRADOR,
-            'department': 'TI'
-        },
-        {
-            'username': 'tecnico1',
-            'email': 'tecnico1@helpdesk.com',
-            'password': 'tecnico123',
-            'role': UserRole.TECNICO,
-            'department': 'TI'
-        },
-        {
-            'username': 'colaborador1',
-            'email': 'colaborador1@helpdesk.com',
-            'password': 'colab123',
-            'role': UserRole.COLABORADOR,
-            'department': 'Vendas'
-        },
-        {
-            'username': 'diretor',
-            'email': 'diretor@helpdesk.com',
-            'password': 'diretor123',
-            'role': UserRole.DIRETORIA,
-            'department': 'Diretoria'
-        }
-    ]
+def get_file_size_mb(file_path):
+    """Get file size in MB"""
+    if os.path.exists(file_path):
+        size_bytes = os.path.getsize(file_path)
+        return round(size_bytes / (1024 * 1024), 2)
+    return 0
 
-    for user_data in demo_users:
-        existing_user = User.query.filter_by(username=user_data['username']).first()
-        if not existing_user:
-            user = User(
-                username=user_data['username'],
-                email=user_data['email'],
-                role=user_data['role'],
-                department=user_data['department']
-            )
-            user.set_password(user_data['password'])
-            db.session.add(user)
-
-    try:
-        db.session.commit()
-        print("Demo users created successfully")
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error creating demo users: {e}")
-
-def get_dashboard_stats():
-    """Get dashboard statistics"""
-    from models import Ticket, TicketStatus, TicketPriority
-    from sqlalchemy import func
-    from datetime import datetime, timedelta
-
-    total_tickets = Ticket.query.count()
-    open_tickets = Ticket.query.filter_by(status=TicketStatus.ABERTO).count()
-    in_progress_tickets = Ticket.query.filter_by(status=TicketStatus.EM_ANDAMENTO).count()
-    resolved_tickets = Ticket.query.filter_by(status=TicketStatus.RESOLVIDO).count()
-    closed_tickets = Ticket.query.filter_by(status=TicketStatus.FECHADO).count()
-
-    # SLA violations
-    sla_violated = Ticket.query.filter_by(sla_violated=True).count()
-
-    # Tickets by priority
-    high_priority = Ticket.query.filter_by(priority=TicketPriority.ALTA).count()
-    medium_priority = Ticket.query.filter_by(priority=TicketPriority.MEDIA).count()
-    low_priority = Ticket.query.filter_by(priority=TicketPriority.BAIXA).count()
-
-    # Critical tickets (assuming CRITICA priority exists)
-    try:
-        critical_tickets = Ticket.query.filter_by(priority=TicketPriority.CRITICA).count()
-    except:
-        critical_tickets = high_priority  # fallback to high priority
-
-    # Tickets created today
-    today = datetime.utcnow().date()
-    today_start = datetime.combine(today, datetime.min.time())
-    today_end = datetime.combine(today, datetime.max.time())
-    tickets_today = Ticket.query.filter(
-        Ticket.created_at >= today_start,
-        Ticket.created_at <= today_end
-    ).count()
-
-    return {
-        'total_tickets': total_tickets,
-        'open_tickets': open_tickets,
-        'in_progress_tickets': in_progress_tickets,
-        'resolved_tickets': resolved_tickets,
-        'closed_tickets': closed_tickets,
-        'sla_violated': sla_violated,
-        'high_priority': high_priority,
-        'medium_priority': medium_priority,
-        'low_priority': low_priority,
-        'critical_tickets': critical_tickets,
-        'tickets_today': tickets_today
+def get_priority_color(priority):
+    """Get color class for priority"""
+    color_map = {
+        'Alta': 'text-red-600 bg-red-50',
+        'Média': 'text-yellow-600 bg-yellow-50',
+        'Baixa': 'text-green-600 bg-green-50'
     }
+    return color_map.get(priority, 'text-gray-600 bg-gray-50')
 
-    # Tickets this week
-    week_start = datetime.utcnow() - timedelta(days=7)
-    tickets_this_week = Ticket.query.filter(Ticket.created_at >= week_start).count()
-
-    # Calculate average resolution time
-    resolved_with_time = Ticket.query.filter(
-        Ticket.status == TicketStatus.RESOLVIDO,
-        Ticket.resolved_at.isnot(None)
-    ).all()
-
-    avg_resolution_time = "N/A"
-    if resolved_with_time:
-        total_time = sum([
-            (ticket.resolved_at - ticket.created_at).total_seconds() 
-            for ticket in resolved_with_time
-        ])
-        avg_seconds = total_time / len(resolved_with_time)
-        avg_hours = avg_seconds / 3600
-        avg_resolution_time = f"{avg_hours:.1f}h"
-
-    return {
-        'total_tickets': total_tickets,
-        'open_tickets': open_tickets,
-        'in_progress_tickets': in_progress_tickets,
-        'resolved_tickets': resolved_tickets,
-        'closed_tickets': closed_tickets,
-        'sla_violated': sla_violated,
-        'critical_tickets': critical_tickets,
-        'high_priority': high_priority,
-        'medium_priority': medium_priority,
-        'low_priority': low_priority,
-        'tickets_today': tickets_today,
-        'tickets_this_week': tickets_this_week,
-        'avg_resolution_time': avg_resolution_time
+def get_status_color(status):
+    """Get color class for status"""
+    color_map = {
+        'Aberto': 'text-blue-600 bg-blue-50',
+        'Em Andamento': 'text-yellow-600 bg-yellow-50',
+        'Resolvido': 'text-green-600 bg-green-50',
+        'Fechado': 'text-gray-600 bg-gray-50'
     }
+    return color_map.get(status, 'text-gray-600 bg-gray-50')
+
+def get_sla_color(sla_status):
+    """Get color class for SLA status"""
+    color_map = {
+        'ok': 'text-green-600 bg-green-50',
+        'warning': 'text-yellow-600 bg-yellow-50',
+        'violated': 'text-red-600 bg-red-50',
+        'completed': 'text-gray-600 bg-gray-50'
+    }
+    return color_map.get(sla_status, 'text-gray-600 bg-gray-50')

@@ -1,570 +1,508 @@
 {% extends "base.html" %}
 
-{% block title %}Chamados - Sistema de Chamados TI{% endblock %}
+{% block title %}Chamados - TechSupport Pro{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Chamados</h1>
-            <p class="mt-1 text-sm text-gray-600">
-                Gerencie todos os chamados do sistema
-            </p>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                <i class="fas fa-ticket-alt text-tech-primary mr-3"></i>Chamados
+            </h1>
+            <p class="text-gray-600">Gerencie e acompanhe todos os chamados do sistema.</p>
         </div>
-        <button 
-            type="button" 
-            id="new-ticket-btn"
-            class="btn-primary"
-        >
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-            </svg>
-            Novo Chamado
+        
+        {% if user.role in ['Colaborador', 'Administrador'] %}
+        <button onclick="openNewTicketModal()" class="bg-tech-primary hover:bg-tech-secondary text-white px-6 py-3 rounded-lg transition-colors font-medium">
+            <i class="fas fa-plus mr-2"></i>Novo Chamado
         </button>
+        {% endif %}
     </div>
 
     <!-- Filters -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="text-lg font-semibold">Filtros</h3>
-        </div>
-        <form id="filters-form" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-filter text-tech-accent mr-2"></i>Filtros
+        </h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-                <label class="form-label">Status</label>
-                <select id="filter-status" class="form-select">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select id="filter-status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                     <option value="">Todos</option>
-                    <option value="aberto">Aberto</option>
-                    <option value="em_andamento">Em Andamento</option>
-                    <option value="resolvido">Resolvido</option>
-                    <option value="fechado">Fechado</option>
+                    <option value="Aberto">Aberto</option>
+                    <option value="Em Andamento">Em Andamento</option>
+                    <option value="Resolvido">Resolvido</option>
+                    <option value="Fechado">Fechado</option>
                 </select>
             </div>
-
+            
             <div>
-                <label class="form-label">Prioridade</label>
-                <select id="filter-priority" class="form-select">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
+                <select id="filter-priority" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                     <option value="">Todas</option>
-                    <option value="alta">Alta</option>
-                    <option value="media">Média</option>
-                    <option value="baixa">Baixa</option>
+                    <option value="Alta">Alta</option>
+                    <option value="Média">Média</option>
+                    <option value="Baixa">Baixa</option>
                 </select>
             </div>
-
+            
             <div>
-                <label class="form-label">Departamento</label>
-                <select id="filter-department" class="form-select">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+                <select id="filter-department" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                     <option value="">Todos</option>
                     <option value="TI">TI</option>
+                    <option value="RH">RH</option>
                     <option value="Vendas">Vendas</option>
                     <option value="Marketing">Marketing</option>
-                    <option value="RH">RH</option>
                     <option value="Financeiro">Financeiro</option>
                 </select>
             </div>
-
-            <div data-role-required="tecnico,administrador">
-                <label class="form-label">Técnico</label>
-                <select id="filter-technician" class="form-select">
+            
+            {% if user.role in ['Administrador', 'Técnico'] %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Técnico</label>
+                <select id="filter-assigned" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                     <option value="">Todos</option>
+                    <option value="unassigned">Não Atribuído</option>
                 </select>
             </div>
-
-            <div class="flex items-end">
-                <button type="submit" class="btn-primary w-full">
-                    Filtrar
-                </button>
-            </div>
-        </form>
+            {% endif %}
+        </div>
+        
+        <div class="flex justify-between items-center mt-4">
+            <button onclick="clearFilters()" class="text-gray-600 hover:text-gray-800 transition-colors">
+                <i class="fas fa-times-circle mr-1"></i>Limpar Filtros
+            </button>
+            <button onclick="applyFilters()" class="bg-tech-accent hover:bg-tech-accent-dark text-white px-4 py-2 rounded-lg transition-colors">
+                <i class="fas fa-search mr-2"></i>Aplicar Filtros
+            </button>
+        </div>
     </div>
 
-    <!-- Tickets Table -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="text-lg font-semibold">Lista de Chamados</h3>
-            <div class="text-sm text-gray-600">
-                <span id="tickets-count">0</span> chamados encontrados
+    <!-- Tickets List -->
+    <div class="bg-white rounded-xl shadow-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-900">Lista de Chamados</h3>
+                <div class="flex items-center space-x-2 text-sm text-gray-600">
+                    <span id="tickets-count">Carregando...</span>
+                    <button onclick="refreshTickets()" class="text-tech-primary hover:text-tech-secondary transition-colors">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
             </div>
         </div>
         
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
                     <tr>
-                        <th>ID</th>
-                        <th>Título</th>
-                        <th>Status</th>
-                        <th>Prioridade</th>
-                        <th>Solicitante</th>
-                        <th>Técnico</th>
-                        <th>Departamento</th>
-                        <th>SLA</th>
-                        <th>Criado em</th>
-                        <th>Ações</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Chamado
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Prioridade
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Departamento
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Criado em
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            SLA
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Ações
+                        </th>
                     </tr>
                 </thead>
-                <tbody id="tickets-tbody">
+                <tbody id="tickets-table-body" class="bg-white divide-y divide-gray-200">
+                    <!-- Loading skeleton -->
                     <tr>
-                        <td colspan="10" class="text-center py-8">
-                            <div class="loading-spinner mx-auto"></div>
-                            <p class="text-gray-500 mt-2">Carregando chamados...</p>
+                        <td colspan="7" class="px-6 py-12 text-center">
+                            <div class="flex justify-center items-center">
+                                <i class="fas fa-spinner fa-spin text-tech-primary text-2xl mr-3"></i>
+                                <span class="text-gray-600">Carregando chamados...</span>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
             </table>
         </div>
+        
+        <!-- Pagination -->
+        <div id="pagination" class="px-6 py-4 border-t border-gray-200 hidden">
+            <div class="flex justify-between items-center">
+                <div class="text-sm text-gray-600" id="pagination-info"></div>
+                <div class="flex space-x-2" id="pagination-buttons"></div>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- New Ticket Modal -->
-<div id="new-ticket-modal" class="modal-overlay hidden">
-    <div class="modal-content max-w-2xl">
-        <div class="modal-header">
-            <h3 class="text-lg font-semibold">Novo Chamado</h3>
+{% if user.role in ['Colaborador', 'Administrador'] %}
+<div id="new-ticket-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-plus-circle text-tech-primary mr-2"></i>Novo Chamado
+            </h3>
+            <button onclick="closeNewTicketModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-xl"></i>
+            </button>
         </div>
+        
         <form id="new-ticket-form">
-            <div class="modal-body space-y-4">
+            <div class="space-y-4">
                 <div>
-                    <label class="form-label">Título *</label>
-                    <input type="text" id="ticket-title" class="form-input" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                    <input type="text" id="ticket-title" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                 </div>
-
+                
                 <div>
-                    <label class="form-label">Descrição *</label>
-                    <textarea id="ticket-description" class="form-textarea" rows="4" required></textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                    <textarea id="ticket-description" rows="4" required 
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent"></textarea>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="form-label">Departamento *</label>
-                        <select id="ticket-department" class="form-select" required>
-                            <option value="">Selecione...</option>
-                            <option value="TI">TI</option>
-                            <option value="Vendas">Vendas</option>
-                            <option value="Marketing">Marketing</option>
-                            <option value="RH">RH</option>
-                            <option value="Financeiro">Financeiro</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="form-label">Prioridade *</label>
-                        <select id="ticket-priority" class="form-select" required>
-                            <option value="">Selecione...</option>
-                            <option value="alta">Alta (4h)</option>
-                            <option value="media">Média (8h)</option>
-                            <option value="baixa">Baixa (24h)</option>
-                        </select>
-                    </div>
-                </div>
-
+                
                 <div>
-                    <label class="form-label">Observações</label>
-                    <textarea id="ticket-observations" class="form-textarea" rows="3"></textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
+                    <select id="ticket-priority" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
+                        <option value="Baixa">Baixa</option>
+                        <option value="Média">Média</option>
+                        <option value="Alta">Alta</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+                    <input type="text" id="ticket-department" value="{{ user.department }}" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-tech-accent focus:border-tech-accent">
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" data-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn-primary">Criar Chamado</button>
+            
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" onclick="closeNewTicketModal()" 
+                        class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        class="px-6 py-2 bg-tech-primary hover:bg-tech-secondary text-white rounded-lg transition-colors">
+                    <i class="fas fa-plus mr-2"></i>Criar Chamado
+                </button>
             </div>
         </form>
     </div>
 </div>
-
-<!-- Ticket Actions Modal -->
-<div id="ticket-actions-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 class="text-lg font-semibold">Ações do Chamado</h3>
-        </div>
-        <div class="modal-body space-y-4" id="ticket-actions-body">
-            <!-- Dynamic content -->
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn-secondary" data-dismiss="modal">Fechar</button>
-        </div>
-    </div>
-</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Redirect if not authenticated
-    if (!localStorage.getItem('token')) {
-        window.location.href = '/';
+// Tickets page specific JavaScript
+let currentPage = 1;
+let currentFilters = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadTickets();
+    loadTechnicians();
+});
+
+async function loadTickets(page = 1) {
+    try {
+        showLoading();
+        
+        const params = new URLSearchParams({
+            page: page,
+            per_page: 10,
+            ...currentFilters
+        });
+        
+        const response = await axios.get(`/api/tickets?${params}`);
+        const data = response.data;
+        
+        renderTicketsTable(data.tickets);
+        renderPagination(data.pagination);
+        updateTicketsCount(data.pagination.total);
+        
+        currentPage = page;
+    } catch (error) {
+        console.error('Error loading tickets:', error);
+        showToast('Erro ao carregar chamados', 'error');
+    } finally {
+        hideLoading();
     }
+}
 
-    class TicketsManager {
-        constructor() {
-            this.tickets = [];
-            this.technicians = [];
-            this.init();
-        }
-
-        async init() {
-            await this.loadTechnicians();
-            await this.loadTickets();
-            this.setupEventListeners();
-            this.setupFilters();
-        }
-
-        async loadTechnicians() {
-            try {
-                const response = await axios.get('/api/technicians');
-                this.technicians = response.data;
-                this.populateTechnicianFilter();
-            } catch (error) {
-                console.error('Failed to load technicians:', error);
-            }
-        }
-
-        populateTechnicianFilter() {
-            const select = document.getElementById('filter-technician');
-            if (select) {
-                this.technicians.forEach(tech => {
-                    const option = document.createElement('option');
-                    option.value = tech.id;
-                    option.textContent = tech.username;
-                    select.appendChild(option);
-                });
-            }
-        }
-
-        async loadTickets(filters = {}) {
-            try {
-                const params = new URLSearchParams(filters);
-                const response = await axios.get(`/api/tickets?${params}`);
-                this.tickets = response.data;
-                this.renderTickets();
-                this.updateTicketsCount();
-            } catch (error) {
-                console.error('Failed to load tickets:', error);
-                this.showError('Erro ao carregar chamados');
-            }
-        }
-
-        renderTickets() {
-            const tbody = document.getElementById('tickets-tbody');
-            
-            if (this.tickets.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="10" class="text-center py-8">
-                            <div class="text-gray-500">
-                                <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                                <p>Nenhum chamado encontrado</p>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            tbody.innerHTML = this.tickets.map(ticket => {
-                const slaClass = this.getSLAClass(ticket.time_until_sla);
-                const slaText = this.formatSLATime(ticket.time_until_sla);
-                
-                return `
-                    <tr class="hover:bg-gray-50">
-                        <td class="font-mono text-sm">#${ticket.id}</td>
-                        <td>
-                            <div class="max-w-xs">
-                                <p class="font-medium truncate">${ticket.title}</p>
-                                <p class="text-xs text-gray-500 truncate">${ticket.description.substring(0, 50)}...</p>
-                            </div>
-                        </td>
-                        <td>
-                            <span class="status-${ticket.status}">
-                                ${this.formatStatus(ticket.status)}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="priority-${ticket.priority}">
-                                ${ticket.priority}
-                            </span>
-                        </td>
-                        <td class="text-sm">${ticket.requester || '-'}</td>
-                        <td class="text-sm">${ticket.assigned_to || '-'}</td>
-                        <td class="text-sm">${ticket.department}</td>
-                        <td>
-                            <span class="text-xs px-2 py-1 rounded-full ${slaClass}">
-                                ${slaText}
-                            </span>
-                        </td>
-                        <td class="text-sm">${window.helpDeskApp.formatRelativeTime(ticket.created_at)}</td>
-                        <td>
-                            <div class="flex space-x-1">
-                                <a href="/ticket/${ticket.id}" class="text-primary-600 hover:text-primary-700 text-xs font-medium">
-                                    Ver
-                                </a>
-                                <button type="button" class="text-gray-600 hover:text-gray-700 text-xs font-medium" onclick="ticketsManager.showActions(${ticket.id})">
-                                    Ações
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        getSLAClass(timeRemaining) {
-            if (timeRemaining <= 0) return 'bg-red-100 text-red-800';
-            if (timeRemaining <= 3600) return 'bg-yellow-100 text-yellow-800';
-            return 'bg-green-100 text-green-800';
-        }
-
-        formatSLATime(seconds) {
-            if (seconds <= 0) return 'Vencido';
-            
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            
-            if (hours > 0) {
-                return `${hours}h ${minutes}m`;
-            } else {
-                return `${minutes}m`;
-            }
-        }
-
-        formatStatus(status) {
-            const statusMap = {
-                'aberto': 'Aberto',
-                'em_andamento': 'Em Andamento',
-                'resolvido': 'Resolvido',
-                'fechado': 'Fechado'
-            };
-            return statusMap[status] || status;
-        }
-
-        updateTicketsCount() {
-            const countElement = document.getElementById('tickets-count');
-            if (countElement) {
-                countElement.textContent = this.tickets.length;
-            }
-        }
-
-        setupEventListeners() {
-            // New ticket button
-            document.getElementById('new-ticket-btn').addEventListener('click', () => {
-                this.showNewTicketModal();
-            });
-
-            // New ticket form
-            document.getElementById('new-ticket-form').addEventListener('submit', (e) => {
-                this.handleNewTicketSubmit(e);
-            });
-
-            // Filters form
-            document.getElementById('filters-form').addEventListener('submit', (e) => {
-                this.handleFiltersSubmit(e);
-            });
-        }
-
-        setupFilters() {
-            // Get URL parameters for initial filters
-            const urlParams = new URLSearchParams(window.location.search);
-            const filters = {};
-            
-            ['status', 'priority', 'department', 'assigned_to'].forEach(param => {
-                const value = urlParams.get(param);
-                if (value) {
-                    filters[param] = value;
-                    const element = document.getElementById(`filter-${param === 'assigned_to' ? 'technician' : param}`);
-                    if (element) {
-                        element.value = value;
-                    }
-                }
-            });
-
-            if (Object.keys(filters).length > 0) {
-                this.loadTickets(filters);
-            }
-        }
-
-        showNewTicketModal() {
-            document.getElementById('new-ticket-modal').classList.remove('hidden');
-            document.getElementById('ticket-title').focus();
-        }
-
-        async handleNewTicketSubmit(e) {
-            e.preventDefault();
-            
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            const formData = {
-                title: document.getElementById('ticket-title').value,
-                description: document.getElementById('ticket-description').value,
-                department: document.getElementById('ticket-department').value,
-                priority: document.getElementById('ticket-priority').value,
-                observations: document.getElementById('ticket-observations').value
-            };
-
-            try {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<div class="loading-spinner mr-2"></div>Criando...';
-
-                await axios.post('/api/tickets', formData);
-                
-                window.helpDeskApp.showAlert('Chamado criado com sucesso!', 'success');
-                this.closeModal();
-                this.resetNewTicketForm();
-                this.loadTickets();
-
-            } catch (error) {
-                console.error('Failed to create ticket:', error);
-                window.helpDeskApp.showAlert(
-                    error.response?.data?.message || 'Erro ao criar chamado',
-                    'error'
-                );
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = 'Criar Chamado';
-            }
-        }
-
-        handleFiltersSubmit(e) {
-            e.preventDefault();
-            
-            const filters = {};
-            const formData = new FormData(e.target);
-            
-            const status = document.getElementById('filter-status').value;
-            const priority = document.getElementById('filter-priority').value;
-            const department = document.getElementById('filter-department').value;
-            const technician = document.getElementById('filter-technician').value;
-
-            if (status) filters.status = status;
-            if (priority) filters.priority = priority;
-            if (department) filters.department = department;
-            if (technician) filters.assigned_to = technician;
-
-            this.loadTickets(filters);
-
-            // Update URL
-            const params = new URLSearchParams(filters);
-            const newUrl = `${window.location.pathname}?${params}`;
-            window.history.pushState({}, '', newUrl);
-        }
-
-        async showActions(ticketId) {
-            const ticket = this.tickets.find(t => t.id === ticketId);
-            if (!ticket) return;
-
-            const modal = document.getElementById('ticket-actions-modal');
-            const body = document.getElementById('ticket-actions-body');
-            
-            // Check user permissions
-            const user = window.helpDeskApp.user;
-            const canModify = user.role === 'administrador' || 
-                             (user.role === 'tecnico' && (ticket.assigned_to === user.username || !ticket.assigned_to)) ||
-                             (user.role === 'colaborador' && ticket.requester === user.username && ticket.status === 'aberto');
-
-            let actionsHTML = `
-                <div class="space-y-3">
-                    <div class="p-3 bg-gray-50 rounded-lg">
-                        <h4 class="font-medium">${ticket.title}</h4>
-                        <p class="text-sm text-gray-600">ID: #${ticket.id}</p>
+function renderTicketsTable(tickets) {
+    const tbody = document.getElementById('tickets-table-body');
+    
+    if (tickets.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="px-6 py-12 text-center">
+                    <div class="text-gray-500">
+                        <i class="fas fa-inbox text-4xl mb-4 opacity-50"></i>
+                        <p class="text-lg font-medium">Nenhum chamado encontrado</p>
+                        <p class="text-sm">Tente ajustar os filtros ou criar um novo chamado.</p>
                     </div>
-            `;
-
-            if (canModify) {
-                actionsHTML += `
-                    <div class="space-y-2">
-                        <h5 class="font-medium text-sm">Status</h5>
-                        <select id="action-status" class="form-select">
-                            <option value="aberto" ${ticket.status === 'aberto' ? 'selected' : ''}>Aberto</option>
-                            <option value="em_andamento" ${ticket.status === 'em_andamento' ? 'selected' : ''}>Em Andamento</option>
-                            <option value="resolvido" ${ticket.status === 'resolvido' ? 'selected' : ''}>Resolvido</option>
-                            <option value="fechado" ${ticket.status === 'fechado' ? 'selected' : ''}>Fechado</option>
-                        </select>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = tickets.map(ticket => {
+        const priorityClass = getPriorityClass(ticket.priority);
+        const statusClass = getStatusClass(ticket.status);
+        const slaStatus = getSLAStatus(ticket);
+        
+        return `
+            <tr class="hover:bg-gray-50 transition-colors">
+                <td class="px-6 py-4">
+                    <div>
+                        <div class="text-sm font-medium text-gray-900">#${ticket.id} - ${ticket.title}</div>
+                        <div class="text-sm text-gray-500 truncate max-w-64">${ticket.description}</div>
+                        <div class="text-xs text-gray-400 mt-1">Por: ${ticket.creator.username}</div>
                     </div>
-                `;
+                </td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${priorityClass}">
+                        ${ticket.priority}
+                    </span>
+                </td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                        ${ticket.status}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-900">${ticket.department}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">
+                    ${formatDateTime(ticket.created_at)}
+                </td>
+                <td class="px-6 py-4">
+                    ${slaStatus}
+                </td>
+                <td class="px-6 py-4 text-sm font-medium">
+                    <a href="/ticket/${ticket.id}" class="text-tech-primary hover:text-tech-secondary">
+                        <i class="fas fa-eye mr-1"></i>Ver
+                    </a>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
 
-                if (user.role === 'administrador' || user.role === 'tecnico') {
-                    actionsHTML += `
-                        <div class="space-y-2">
-                            <h5 class="font-medium text-sm">Técnico Responsável</h5>
-                            <select id="action-technician" class="form-select">
-                                <option value="">Nenhum</option>
-                                ${this.technicians.map(tech => `
-                                    <option value="${tech.id}" ${ticket.assigned_to === tech.username ? 'selected' : ''}>
-                                        ${tech.username}
-                                    </option>
-                                `).join('')}
-                            </select>
-                        </div>
-                    `;
-                }
+function getPriorityClass(priority) {
+    const classes = {
+        'Alta': 'bg-red-100 text-red-800',
+        'Média': 'bg-yellow-100 text-yellow-800',
+        'Baixa': 'bg-green-100 text-green-800'
+    };
+    return classes[priority] || 'bg-gray-100 text-gray-800';
+}
 
-                actionsHTML += `
-                    <div class="pt-3">
-                        <button type="button" class="btn-primary w-full" onclick="ticketsManager.updateTicket(${ticketId})">
-                            Atualizar Chamado
-                        </button>
-                    </div>
-                `;
-            } else {
-                actionsHTML += `
-                    <div class="text-center text-gray-500 py-4">
-                        <p>Você não tem permissão para modificar este chamado.</p>
-                    </div>
-                `;
-            }
+function getStatusClass(status) {
+    const classes = {
+        'Aberto': 'bg-blue-100 text-blue-800',
+        'Em Andamento': 'bg-orange-100 text-orange-800',
+        'Resolvido': 'bg-green-100 text-green-800',
+        'Fechado': 'bg-gray-100 text-gray-800'
+    };
+    return classes[status] || 'bg-gray-100 text-gray-800';
+}
 
-            actionsHTML += '</div>';
-            body.innerHTML = actionsHTML;
-            modal.classList.remove('hidden');
-        }
+function getSLAStatus(ticket) {
+    if (!ticket.sla_deadline || ['Resolvido', 'Fechado'].includes(ticket.status)) {
+        return '<span class="text-xs text-gray-500">-</span>';
+    }
+    
+    if (ticket.sla_violated) {
+        return '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"><i class="fas fa-exclamation-triangle mr-1"></i>Violado</span>';
+    }
+    
+    if (ticket.sla_near_violation) {
+        return '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800"><i class="fas fa-clock mr-1"></i>Crítico</span>';
+    }
+    
+    return '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-check mr-1"></i>Normal</span>';
+}
 
-        async updateTicket(ticketId) {
-            const status = document.getElementById('action-status')?.value;
-            const technicianId = document.getElementById('action-technician')?.value;
+function renderPagination(pagination) {
+    const paginationDiv = document.getElementById('pagination');
+    const paginationInfo = document.getElementById('pagination-info');
+    const paginationButtons = document.getElementById('pagination-buttons');
+    
+    if (pagination.pages <= 1) {
+        paginationDiv.classList.add('hidden');
+        return;
+    }
+    
+    paginationDiv.classList.remove('hidden');
+    
+    // Update info
+    const start = (pagination.page - 1) * pagination.per_page + 1;
+    const end = Math.min(pagination.page * pagination.per_page, pagination.total);
+    paginationInfo.textContent = `Mostrando ${start}-${end} de ${pagination.total} chamados`;
+    
+    // Generate buttons
+    let buttons = '';
+    
+    // Previous button
+    if (pagination.has_prev) {
+        buttons += `<button onclick="loadTickets(${pagination.page - 1})" class="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors">Anterior</button>`;
+    }
+    
+    // Page numbers
+    const maxPages = 5;
+    let startPage = Math.max(1, pagination.page - Math.floor(maxPages / 2));
+    let endPage = Math.min(pagination.pages, startPage + maxPages - 1);
+    
+    if (endPage - startPage < maxPages - 1) {
+        startPage = Math.max(1, endPage - maxPages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const isActive = i === pagination.page;
+        buttons += `
+            <button onclick="loadTickets(${i})" 
+                    class="px-3 py-2 text-sm ${isActive ? 'bg-tech-primary text-white' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'} rounded transition-colors">
+                ${i}
+            </button>
+        `;
+    }
+    
+    // Next button
+    if (pagination.has_next) {
+        buttons += `<button onclick="loadTickets(${pagination.page + 1})" class="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors">Próximo</button>`;
+    }
+    
+    paginationButtons.innerHTML = buttons;
+}
+
+function updateTicketsCount(total) {
+    document.getElementById('tickets-count').textContent = `${total} chamado(s)`;
+}
+
+async function loadTechnicians() {
+    try {
+        const response = await axios.get('/api/technicians');
+        const technicians = response.data.technicians;
+        
+        const filterAssigned = document.getElementById('filter-assigned');
+        if (filterAssigned) {
+            // Clear existing options except the default ones
+            const defaultOptions = Array.from(filterAssigned.options).slice(0, 2);
+            filterAssigned.innerHTML = '';
+            defaultOptions.forEach(option => filterAssigned.appendChild(option));
             
-            const updateData = {};
-            if (status) updateData.status = status;
-            if (technicianId !== undefined) updateData.assigned_to_id = technicianId || null;
-
-            try {
-                await axios.put(`/api/tickets/${ticketId}`, updateData);
-                window.helpDeskApp.showAlert('Chamado atualizado com sucesso!', 'success');
-                this.closeModal();
-                this.loadTickets();
-            } catch (error) {
-                console.error('Failed to update ticket:', error);
-                window.helpDeskApp.showAlert('Erro ao atualizar chamado', 'error');
-            }
-        }
-
-        closeModal() {
-            document.querySelectorAll('.modal-overlay').forEach(modal => {
-                modal.classList.add('hidden');
+            // Add technicians
+            technicians.forEach(tech => {
+                const option = document.createElement('option');
+                option.value = tech.id;
+                option.textContent = tech.username;
+                filterAssigned.appendChild(option);
             });
         }
+    } catch (error) {
+        console.error('Error loading technicians:', error);
+    }
+}
 
-        resetNewTicketForm() {
-            document.getElementById('new-ticket-form').reset();
-        }
-
-        showError(message) {
-            const tbody = document.getElementById('tickets-tbody');
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="10" class="text-center py-8">
-                        <div class="text-red-500">
-                            <svg class="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                            </svg>
-                            <p>${message}</p>
-                        </div>
-                    </td>
-                </tr>
-            `;
+function applyFilters() {
+    currentFilters = {
+        status: document.getElementById('filter-status').value,
+        priority: document.getElementById('filter-priority').value,
+        department: document.getElementById('filter-department').value
+    };
+    
+    const filterAssigned = document.getElementById('filter-assigned');
+    if (filterAssigned) {
+        const assignedValue = filterAssigned.value;
+        if (assignedValue === 'unassigned') {
+            currentFilters.assigned_to = 'none';
+        } else if (assignedValue) {
+            currentFilters.assigned_to = assignedValue;
         }
     }
+    
+    loadTickets(1);
+}
 
-    // Initialize tickets manager
-    const ticketsManager = new TicketsManager();
-    window.ticketsManager = ticketsManager;
+function clearFilters() {
+    document.getElementById('filter-status').value = '';
+    document.getElementById('filter-priority').value = '';
+    document.getElementById('filter-department').value = '';
+    
+    const filterAssigned = document.getElementById('filter-assigned');
+    if (filterAssigned) {
+        filterAssigned.value = '';
+    }
+    
+    currentFilters = {};
+    loadTickets(1);
+}
+
+function refreshTickets() {
+    loadTickets(currentPage);
+}
+
+// New ticket functionality
+function openNewTicketModal() {
+    document.getElementById('new-ticket-modal').classList.remove('hidden');
+}
+
+function closeNewTicketModal() {
+    document.getElementById('new-ticket-modal').classList.add('hidden');
+    document.getElementById('new-ticket-form').reset();
+}
+
+document.getElementById('new-ticket-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = {
+        title: document.getElementById('ticket-title').value,
+        description: document.getElementById('ticket-description').value,
+        priority: document.getElementById('ticket-priority').value,
+        department: document.getElementById('ticket-department').value
+    };
+    
+    try {
+        showLoading();
+        
+        const response = await axios.post('/api/tickets', formData);
+        
+        if (response.data.success) {
+            showToast('Chamado criado com sucesso!', 'success');
+            closeNewTicketModal();
+            loadTickets(1); // Reload first page
+        }
+    } catch (error) {
+        console.error('Error creating ticket:', error);
+        showToast('Erro ao criar chamado', 'error');
+    } finally {
+        hideLoading();
+    }
+});
+
+function formatDateTime(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
 </script>
 {% endblock %}

@@ -1,412 +1,281 @@
-// Chat functionality for ticket details
-class TicketChat {
-    constructor(ticketId, socket) {
-        this.ticketId = ticketId;
-        this.socket = socket;
-        this.messages = [];
-        this.init();
-    }
-
-    init() {
-        this.setupChatUI();
-        this.joinTicketRoom();
-        this.loadMessages();
-        this.setupEventListeners();
-    }
-
-    setupChatUI() {
-        const chatContainer = document.getElementById('chat-container');
-        if (!chatContainer) return;
-
+// Chat module for real-time messaging
+const Chat = {
+    currentTicketId: null,
+    typingTimer: null,
+    isTyping: false,
+    
+    // Initialize ticket chat
+    initializeTicketChat(ticketId) {
+        this.currentTicketId = ticketId;
+        this.loadChatMessages(ticketId);
+        this.renderChatInterface(ticketId);
+        
+        // Join the ticket room
+        if (App.socket) {
+            App.socket.emit('join_ticket', { ticket_id: ticketId });
+        }
+    },
+    
+    // Setup socket event listeners
+    setupSocketListeners(socket) {
+        socket.on('connected', (data) => {
+            console.log('Chat connected:', data.message);
+        });
+        
+        socket.on('joined_ticket', (data) => {
+            console.log('Joined ticket chat:', data.ticket_id);
+        });
+        
+        socket.on('new_message', (data) => {
+            this.addMessageToChat(data);
+        });
+        
+        socket.on('user_joined', (data) => {
+            this.addSystemMessage(`${data.user.name} (${data.user.role}) entrou no chat`);
+        });
+        
+        socket.on('user_left', (data) => {
+            this.addSystemMessage(`${data.user.name} (${data.user.role}) saiu do chat`);
+        });
+        
+        socket.on('user_typing', (data) => {
+            this.showTypingIndicator(data.user.name, data.is_typing);
+        });
+        
+        socket.on('error', (data) => {
+            console.error('Chat error:', data.message);
+            App.showNotification(data.message, 'error');
+        });
+    },
+    
+    // Load chat messages
+    async loadChatMessages(ticketId) {
+        try {
+            const response = await axios.get(`/api/tickets/${ticketId}/messages`);
+            const messages = response.data;
+            
+            this.renderMessages(messages);
+            
+        } catch (error) {
+            console.error('Error loading messages:', error);
+            document.getElementById('ticketChat').innerHTML = `
+                <h4 class="font-semibold mb-2">Chat Interno</h4>
+                <p class="text-red-500 text-sm">Erro ao carregar mensagens</p>
+            `;
+        }
+    },
+    
+    // Render chat interface
+    renderChatInterface(ticketId) {
+        const chatContainer = document.getElementById('ticketChat');
+        
         chatContainer.innerHTML = `
-            <div class="chat-messages custom-scrollbar" id="chat-messages" style="height: 300px; overflow-y: auto;">
-                <div class="loading-spinner mx-auto my-8"></div>
-            </div>
-            <div class="chat-input mt-4">
-                <form id="chat-form" class="flex space-x-2">
-                    <input 
-                        type="text" 
-                        id="chat-message-input" 
-                        placeholder="Digite sua mensagem..." 
-                        class="form-input flex-1"
-                        required
-                    >
-                    <button type="submit" class="btn-primary">Enviar</button>
-                </form>
+            <h4 class="font-semibold mb-2">Chat Interno</h4>
+            <div class="border border-gray-200 rounded-lg">
+                <div id="chatMessages" class="chat-container custom-scrollbar overflow-y-auto p-4 bg-gray-50">
+                    <div class="flex items-center justify-center py-4">
+                        <div class="spinner"></div>
+                        <span class="ml-2 text-gray-600">Carregando mensagens...</span>
+                    </div>
+                </div>
+                <div id="typingIndicator" class="px-4 py-2 text-sm text-gray-500 italic" style="display: none;"></div>
+                <div class="border-t p-4">
+                    <div class="flex space-x-2">
+                        <input type="text" 
+                               id="messageInput" 
+                               placeholder="Digite sua mensagem..."
+                               class="flex-1 helpdesk-input"
+                               onkeypress="Chat.handleKeyPress(event)"
+                               oninput="Chat.handleTyping()">
+                        <button onclick="Chat.sendMessage()" 
+                                class="helpdesk-button-primary">
+                            Enviar
+                        </button>
+                    </div>
+                </div>
             </div>
         `;
-    }
-
-    setupEventListeners() {
-        // Chat form submission
-        const chatForm = document.getElementById('chat-form');
-        if (chatForm) {
-            chatForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.sendMessage();
-            });
-        }
-
-        // Socket event listeners
-        if (this.socket) {
-            this.socket.on('new_message', (message) => {
-                this.addMessageToUI(message);
-                this.scrollToBottom();
-            });
-
-            this.socket.on('user_joined', (data) => {
-                this.addSystemMessage(`${data.username} entrou no chat`);
-            });
-
-            this.socket.on('user_left', (data) => {
-                this.addSystemMessage(`${data.username} saiu do chat`);
-            });
-        }
-    }
-
-    joinTicketRoom() {
-        if (this.socket && window.helpDeskApp.token) {
-            this.socket.emit('join_ticket', {
-                token: window.helpDeskApp.token,
-                ticket_id: this.ticketId
-            });
-        }
-    }
-
-    async loadMessages() {
-        try {
-            const response = await axios.get(`/api/tickets/${this.ticketId}/messages`);
-            this.messages = response.data;
-            this.renderMessages();
-        } catch (error) {
-            console.error('Failed to load messages:', error);
-            this.showChatError('Erro ao carregar mensagens');
-        }
-    }
-
-    renderMessages() {
-        const messagesContainer = document.getElementById('chat-messages');
-        if (!messagesContainer) return;
-
-        if (this.messages.length === 0) {
-            messagesContainer.innerHTML = `
-                <div class="text-center text-gray-500 py-8">
-                    <svg class="w-8 h-8 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-4.906-1.436L3 21l2.436-5.094A8.959 8.959 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z"></path>
-                    </svg>
-                    <p>Nenhuma mensagem ainda</p>
+    },
+    
+    // Render messages
+    renderMessages(messages) {
+        const container = document.getElementById('chatMessages');
+        
+        if (messages.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <p>Nenhuma mensagem ainda.</p>
+                    <p class="text-sm">Seja o primeiro a comentar!</p>
                 </div>
             `;
             return;
         }
-
-        messagesContainer.innerHTML = this.messages.map(message => 
-            this.renderMessage(message)
-        ).join('');
-
+        
+        container.innerHTML = messages.map(message => this.renderMessage(message)).join('');
         this.scrollToBottom();
-    }
-
+    },
+    
+    // Render individual message
     renderMessage(message) {
-        const isCurrentUser = message.author === window.helpDeskApp.user?.username;
-        const messageClass = message.message_type === 'system' ? 'system' : 
-                           isCurrentUser ? 'own' : 'other';
-
-        if (message.message_type === 'system') {
+        const isOwnMessage = message.author.id === App.currentUser.id;
+        const isSystemMessage = message.message_type === 'system';
+        
+        if (isSystemMessage) {
             return `
-                <div class="chat-message system">
-                    <div class="flex items-center justify-center space-x-2 text-xs">
-                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                        </svg>
-                        <span>${message.content}</span>
-                        <span class="text-gray-400">${this.formatMessageTime(message.created_at)}</span>
-                    </div>
+                <div class="chat-message chat-message-system">
+                    <div class="text-xs">${message.content}</div>
+                    <div class="text-xs mt-1">${App.formatRelativeTime(message.timestamp)}</div>
                 </div>
             `;
         }
-
-        const roleColors = {
-            'administrador': 'text-red-600',
-            'tecnico': 'text-blue-600',
-            'colaborador': 'text-green-600',
-            'diretoria': 'text-purple-600'
-        };
-
-        const roleColor = roleColors[message.author_role] || 'text-gray-600';
-
+        
+        const messageClass = isOwnMessage ? 'chat-message-own' : 'chat-message-other';
+        
         return `
             <div class="chat-message ${messageClass}">
-                <div class="message-header mb-1">
-                    <span class="font-medium text-sm ${roleColor}">${message.author}</span>
-                    <span class="text-xs text-gray-500 ml-2">${this.formatMessageTime(message.created_at)}</span>
-                </div>
-                <div class="message-content text-sm">
-                    ${this.formatMessageContent(message.content)}
+                ${!isOwnMessage ? `
+                    <div class="text-xs font-medium mb-1">
+                        ${message.author.name} (${message.author.role})
+                    </div>
+                ` : ''}
+                <div class="text-sm">${this.formatMessageContent(message.content)}</div>
+                <div class="text-xs mt-1 opacity-75">
+                    ${App.formatRelativeTime(message.timestamp)}
                 </div>
             </div>
         `;
-    }
-
+    },
+    
+    // Format message content (handle links, etc.)
     formatMessageContent(content) {
         // Basic URL detection and linking
         const urlRegex = /(https?:\/\/[^\s]+)/g;
-        return content.replace(urlRegex, '<a href="$1" target="_blank" class="text-blue-600 underline">$1</a>');
-    }
-
-    formatMessageTime(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleTimeString('pt-BR', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
-    }
-
-    addMessageToUI(message) {
-        const messagesContainer = document.getElementById('chat-messages');
-        if (!messagesContainer) return;
-
-        // If this is the first message, clear the empty state
-        if (this.messages.length === 0) {
-            messagesContainer.innerHTML = '';
-        }
-
-        this.messages.push(message);
-        messagesContainer.insertAdjacentHTML('beforeend', this.renderMessage(message));
-    }
-
+        return content.replace(urlRegex, '<a href="$1" target="_blank" class="underline">$1</a>');
+    },
+    
+    // Add new message to chat
+    addMessageToChat(message) {
+        const container = document.getElementById('chatMessages');
+        const messageHTML = this.renderMessage(message);
+        
+        container.insertAdjacentHTML('beforeend', messageHTML);
+        this.scrollToBottom();
+    },
+    
+    // Add system message
     addSystemMessage(content) {
         const systemMessage = {
-            content,
+            content: content,
+            timestamp: new Date().toISOString(),
             message_type: 'system',
-            author: 'Sistema',
-            created_at: new Date().toISOString(),
-            ticket_id: this.ticketId
+            author: { id: 0, name: 'Sistema', role: 'System' }
         };
-        this.addMessageToUI(systemMessage);
-    }
-
+        
+        this.addMessageToChat(systemMessage);
+    },
+    
+    // Send message
     async sendMessage() {
-        const input = document.getElementById('chat-message-input');
+        const input = document.getElementById('messageInput');
         const content = input.value.trim();
         
-        if (!content) return;
-
-        const submitBtn = document.querySelector('#chat-form button[type="submit"]');
+        if (!content || !this.currentTicketId) return;
+        
+        // Clear input
+        input.value = '';
+        
+        // Stop typing indicator
+        this.stopTyping();
         
         try {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<div class="loading-spinner"></div>';
-
-            // Send via API (socket will handle real-time broadcast)
-            await axios.post(`/api/tickets/${this.ticketId}/messages`, {
-                content
-            });
-
-            input.value = '';
-            this.scrollToBottom();
-
+            // Send via socket for real-time delivery
+            if (App.socket) {
+                App.socket.emit('send_message', {
+                    ticket_id: this.currentTicketId,
+                    content: content
+                });
+            } else {
+                // Fallback to HTTP if socket not available
+                await axios.post(`/api/tickets/${this.currentTicketId}/messages`, {
+                    content: content
+                });
+                
+                // Reload messages
+                this.loadChatMessages(this.currentTicketId);
+            }
+            
         } catch (error) {
-            console.error('Failed to send message:', error);
-            window.helpDeskApp.showAlert('Erro ao enviar mensagem', 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Enviar';
-            input.focus();
+            console.error('Error sending message:', error);
+            App.showNotification('Erro ao enviar mensagem', 'error');
+            
+            // Restore message in input
+            input.value = content;
         }
-    }
-
+    },
+    
+    // Handle key press in message input
+    handleKeyPress(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            this.sendMessage();
+        }
+    },
+    
+    // Handle typing indicator
+    handleTyping() {
+        if (!this.isTyping) {
+            this.isTyping = true;
+            
+            if (App.socket && this.currentTicketId) {
+                App.socket.emit('typing', {
+                    ticket_id: this.currentTicketId,
+                    is_typing: true
+                });
+            }
+        }
+        
+        // Clear existing timer
+        clearTimeout(this.typingTimer);
+        
+        // Set new timer
+        this.typingTimer = setTimeout(() => {
+            this.stopTyping();
+        }, 1000);
+    },
+    
+    // Stop typing indicator
+    stopTyping() {
+        if (this.isTyping) {
+            this.isTyping = false;
+            
+            if (App.socket && this.currentTicketId) {
+                App.socket.emit('typing', {
+                    ticket_id: this.currentTicketId,
+                    is_typing: false
+                });
+            }
+        }
+        
+        clearTimeout(this.typingTimer);
+    },
+    
+    // Show typing indicator
+    showTypingIndicator(userName, isTyping) {
+        const indicator = document.getElementById('typingIndicator');
+        
+        if (isTyping) {
+            indicator.textContent = `${userName} está digitando...`;
+            indicator.style.display = 'block';
+        } else {
+            indicator.style.display = 'none';
+        }
+    },
+    
+    // Scroll to bottom of chat
     scrollToBottom() {
-        const messagesContainer = document.getElementById('chat-messages');
-        if (messagesContainer) {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        const container = document.getElementById('chatMessages');
+        if (container) {
+            container.scrollTop = container.scrollHeight;
         }
     }
-
-    showChatError(message) {
-        const messagesContainer = document.getElementById('chat-messages');
-        if (messagesContainer) {
-            messagesContainer.innerHTML = `
-                <div class="text-center text-red-500 py-8">
-                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                    </svg>
-                    <p>${message}</p>
-                </div>
-            `;
-        }
-    }
-
-    destroy() {
-        if (this.socket) {
-            this.socket.emit('leave_ticket', {
-                token: window.helpDeskApp.token,
-                ticket_id: this.ticketId
-            });
-        }
-    }
-}
-
-// File upload functionality for tickets
-class TicketAttachments {
-    constructor(ticketId) {
-        this.ticketId = ticketId;
-        this.init();
-    }
-
-    init() {
-        this.setupAttachmentUI();
-        this.loadAttachments();
-        this.setupEventListeners();
-    }
-
-    setupAttachmentUI() {
-        const attachmentContainer = document.getElementById('attachment-container');
-        if (!attachmentContainer) return;
-
-        attachmentContainer.innerHTML = `
-            <div class="mb-4">
-                <h4 class="font-medium text-sm mb-2">Anexos</h4>
-                <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                    <input type="file" id="file-input" class="hidden" multiple>
-                    <button type="button" id="upload-btn" class="text-blue-600 hover:text-blue-700">
-                        <svg class="w-6 h-6 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                        </svg>
-                        Clique para enviar arquivos
-                    </button>
-                    <p class="text-xs text-gray-500 mt-1">
-                        Máximo 16MB por arquivo. Tipos permitidos: PDF, DOC, XLS, imagens
-                    </p>
-                </div>
-            </div>
-            <div id="attachments-list" class="space-y-2">
-                <div class="loading-spinner mx-auto"></div>
-            </div>
-        `;
-    }
-
-    setupEventListeners() {
-        const uploadBtn = document.getElementById('upload-btn');
-        const fileInput = document.getElementById('file-input');
-
-        if (uploadBtn && fileInput) {
-            uploadBtn.addEventListener('click', () => {
-                fileInput.click();
-            });
-
-            fileInput.addEventListener('change', (e) => {
-                this.handleFileUpload(e.target.files);
-            });
-        }
-    }
-
-    async handleFileUpload(files) {
-        if (!files || files.length === 0) return;
-
-        for (const file of files) {
-            await this.uploadFile(file);
-        }
-
-        // Clear file input
-        document.getElementById('file-input').value = '';
-    }
-
-    async uploadFile(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const response = await axios.post(`/api/tickets/${this.ticketId}/attachments`, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
-            });
-
-            window.helpDeskApp.showAlert('Arquivo enviado com sucesso', 'success');
-            this.loadAttachments(); // Refresh attachments list
-
-        } catch (error) {
-            console.error('Failed to upload file:', error);
-            window.helpDeskApp.showAlert(
-                error.response?.data?.message || 'Erro ao enviar arquivo', 
-                'error'
-            );
-        }
-    }
-
-    async loadAttachments() {
-        try {
-            const response = await axios.get(`/api/tickets/${this.ticketId}/attachments`);
-            this.renderAttachments(response.data);
-        } catch (error) {
-            console.error('Failed to load attachments:', error);
-            this.showAttachmentsError();
-        }
-    }
-
-    renderAttachments(attachments) {
-        const listContainer = document.getElementById('attachments-list');
-        if (!listContainer) return;
-
-        if (attachments.length === 0) {
-            listContainer.innerHTML = `
-                <div class="text-center text-gray-500 py-4">
-                    <svg class="w-6 h-6 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
-                    </svg>
-                    <p class="text-sm">Nenhum anexo</p>
-                </div>
-            `;
-            return;
-        }
-
-        listContainer.innerHTML = attachments.map(attachment => `
-            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div class="flex items-center space-x-3">
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
-                    </svg>
-                    <div>
-                        <p class="text-sm font-medium">${attachment.original_filename}</p>
-                        <p class="text-xs text-gray-500">
-                            ${this.formatFileSize(attachment.file_size)} • 
-                            ${attachment.uploaded_by} • 
-                            ${window.helpDeskApp.formatRelativeTime(attachment.uploaded_at)}
-                        </p>
-                    </div>
-                </div>
-                <a href="/api/attachments/${attachment.id}/download" 
-                   class="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                    Download
-                </a>
-            </div>
-        `).join('');
-    }
-
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    showAttachmentsError() {
-        const listContainer = document.getElementById('attachments-list');
-        if (listContainer) {
-            listContainer.innerHTML = `
-                <div class="text-center text-red-500 py-4">
-                    <svg class="w-6 h-6 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                    </svg>
-                    <p class="text-sm">Erro ao carregar anexos</p>
-                </div>
-            `;
-        }
-    }
-}
-
-// Export for use in ticket detail page
-window.TicketChat = TicketChat;
-window.TicketAttachments = TicketAttachments;
+};

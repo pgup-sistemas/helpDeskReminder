@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Helpdesk - Sistema de Chamados</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#1B4D72',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        accent: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#3A8C6B',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Main Application Container -->
+    <div id="app" style="display: none;">
+        <!-- Mobile Menu Overlay -->
+        <div id="sidebarOverlay" class="sidebar-overlay lg:hidden" style="display: none;" onclick="App.closeMobileMenu()"></div>
+        
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar lg:translate-x-0 sidebar-hidden lg:sidebar-hidden">
+            <div class="flex flex-col h-full">
+                <!-- Logo/Brand -->
+                <div class="flex items-center justify-center h-16 bg-slate-800 border-b border-slate-700">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-white font-bold text-lg">IT Helpdesk</span>
+                    </div>
+                </div>
+                
+                <!-- Navigation -->
+                <nav class="flex-1 px-2 py-4 space-y-1">
+                    <div class="nav-item active" data-view="dashboard">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v4H8V5z"></path>
+                        </svg>
+                        Dashboard
+                    </div>
+                    
+                    <div class="nav-item" data-view="tickets">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                        Chamados
+                    </div>
+                    
+                    <div class="nav-item" data-view="create-ticket">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Novo Chamado
+                    </div>
+                    
+                    <div class="nav-item admin-only" data-view="users">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                        </svg>
+                        Usuários
+                    </div>
+                    
+                    <div class="nav-item manager-only" data-view="reports">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        Relatórios
+                    </div>
+                </nav>
+                
+                <!-- User Info -->
+                <div class="px-4 py-4 border-t border-slate-700">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <div class="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
+                                <span class="text-white text-sm font-medium" id="userInitial">U</span>
+                            </div>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-white" id="userName">Usuário</p>
+                            <p class="text-xs text-gray-300" id="userRole">Role</p>
+                        </div>
+                    </div>
+                    <button id="logoutBtn" class="w-full mt-3 text-left text-sm text-gray-300 hover:text-white">
+                        Sair
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <div class="lg:ml-64">
+            <!-- Top Bar -->
+            <header class="bg-white shadow-sm border-b border-gray-200">
+                <div class="flex justify-between items-center px-4 py-4">
+                    <div class="flex items-center">
+                        <button id="menuToggle" class="lg:hidden text-gray-500 hover:text-gray-700 mr-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                            </svg>
+                        </button>
+                        <h1 class="text-2xl font-bold text-gray-900">Sistema de Chamados IT</h1>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600">Bem-vindo, <span id="userNameTop" class="font-medium">Usuário</span></span>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Page Content -->
+            <main class="p-6">
+                <!-- Dashboard View -->
+                <div id="dashboardView" class="content-section">
+                    <div class="mb-6">
+                        <h2 class="text-heading">Dashboard</h2>
+                        <p class="text-caption">Visão geral do sistema de chamados</p>
+                    </div>
+                    
+                    <!-- Statistics Cards -->
+                    <div id="statsCards" class="dashboard-grid mb-8">
+                        <!-- Stats cards will be rendered here -->
+                    </div>
+                    
+                    <!-- Charts -->
+                    <div class="dashboard-grid">
+                        <div class="helpdesk-card">
+                            <canvas id="priorityChart" width="400" height="300"></canvas>
+                        </div>
+                        
+                        <div class="helpdesk-card">
+                            <canvas id="statusChart" width="400" height="300"></canvas>
+                        </div>
+                        
+                        <div class="helpdesk-card">
+                            <canvas id="departmentChart" width="400" height="300"></canvas>
+                        </div>
+                        
+                        <div class="helpdesk-card">
+                            <canvas id="activityChart" width="400" height="300"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div id="dashboardContent">
+                        <!-- Dashboard content will be loaded here -->
+                    </div>
+                </div>
+                
+                <!-- Tickets View -->
+                <div id="ticketsView" class="content-section" style="display: none;">
+                    <div class="mb-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h2 class="text-heading">Chamados</h2>
+                                <p class="text-caption">Gerencie todos os chamados do sistema</p>
+                            </div>
+                            <button onclick="App.loadView('create-ticket')" class="helpdesk-button-primary">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                Novo Chamado
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Filters -->
+                    <div id="ticketsFilters">
+                        <!-- Filters will be rendered here -->
+                    </div>
+                    
+                    <!-- Tickets Table -->
+                    <div class="helpdesk-card">
+                        <div id="ticketsTable">
+                            <!-- Tickets table will be rendered here -->
+                        </div>
+                    </div>
+                    
+                    <div id="ticketsContent">
+                        <!-- Tickets content will be loaded here -->
+                    </div>
+                </div>
+                
+                <!-- Create Ticket View -->
+                <div id="create-ticketView" class="content-section" style="display: none;">
+                    <div class="mb-6">
+                        <h2 class="text-heading">Novo Chamado</h2>
+                        <p class="text-caption">Criar um novo chamado de suporte</p>
+                    </div>
+                    
+                    <div class="max-w-2xl">
+                        <form id="createTicketForm" class="helpdesk-card">
+                            <div class="space-y-6">
+                                <div>
+                                    <label for="title" class="block text-sm font-medium text-gray-700 mb-1">
+                                        Título *
+                                    </label>
+                                    <input type="text" 
+                                           id="title" 
+                                           name="title" 
+                                           required 
+                                           class="helpdesk-input"
+                                           placeholder="Descreva brevemente o problema">
+                                </div>
+                                
+                                <div>
+                                    <label for="description" class="block text-sm font-medium text-gray-700 mb-1">
+                                        Descrição *
+                                    </label>
+                                    <textarea id="description" 
+                                              name="description" 
+                                              required 
+                                              rows="4" 
+                                              class="helpdesk-textarea"
+                                              placeholder="Descreva o problema em detalhes"></textarea>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="department" class="block text-sm font-medium text-gray-700 mb-1">
+                                            Departamento *
+                                        </label>
+                                        <select id="department" name="department" required class="helpdesk-select">
+                                            <option value="">Selecione...</option>
+                                            <option value="TI">TI</option>
+                                            <option value="RH">Recursos Humanos</option>
+                                            <option value="Financeiro">Financeiro</option>
+                                            <option value="Vendas">Vendas</option>
+                                            <option value="Marketing">Marketing</option>
+                                            <option value="Operações">Operações</option>
+                                            <option value="Suporte">Suporte</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="priority" class="block text-sm font-medium text-gray-700 mb-1">
+                                            Prioridade *
+                                        </label>
+                                        <select id="priority" name="priority" required class="helpdesk-select">
+                                            <option value="">Selecione...</option>
+                                            <option value="Baixa">Baixa (24h)</option>
+                                            <option value="Média">Média (8h)</option>
+                                            <option value="Alta">Alta (4h)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label for="observations" class="block text-sm font-medium text-gray-700 mb-1">
+                                        Observações
+                                    </label>
+                                    <textarea id="observations" 
+                                              name="observations" 
+                                              rows="3" 
+                                              class="helpdesk-textarea"
+                                              placeholder="Informações adicionais (opcional)"></textarea>
+                                </div>
+                                
+                                <div class="flex justify-end space-x-3">
+                                    <button type="button" 
+                                            onclick="App.loadView('tickets')" 
+                                            class="helpdesk-button-secondary">
+                                        Cancelar
+                                    </button>
+                                    <button type="submit" class="helpdesk-button-primary">
+                                        Criar Chamado
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Users View -->
+                <div id="usersView" class="content-section admin-only" style="display: none;">
+                    <div class="mb-6">
+                        <h2 class="text-heading">Usuários</h2>
+                        <p class="text-caption">Gerencie os usuários do sistema</p>
+                    </div>
+                    
+                    <div class="helpdesk-card">
+                        <div id="usersTable">
+                            <!-- Users table will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Reports View -->
+                <div id="reportsView" class="content-section manager-only" style="display: none;">
+                    <div class="mb-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h2 class="text-heading">Relatórios</h2>
+                                <p class="text-caption">Relatórios e análises do sistema</p>
+                            </div>
+                            <button onclick="Reports.exportData()" class="helpdesk-button-primary">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Exportar CSV
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Report Filters -->
+                    <div class="helpdesk-card mb-6">
+                        <h3 class="text-lg font-semibold mb-4">Filtros</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Data Início</label>
+                                <input type="date" id="reportStartDate" class="helpdesk-input">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Data Fim</label>
+                                <input type="date" id="reportEndDate" class="helpdesk-input">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                <select id="reportStatus" class="helpdesk-select">
+                                    <option value="">Todos</option>
+                                    <option value="Aberto">Aberto</option>
+                                    <option value="Em Andamento">Em Andamento</option>
+                                    <option value="Resolvido">Resolvido</option>
+                                    <option value="Fechado">Fechado</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                <button onclick="Reports.applyFilters()" class="helpdesk-button-primary w-full">
+                                    Aplicar Filtros
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="reportsContent">
+                        <!-- Reports content will be loaded here -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tickets.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    
+    <script>
+        // Users module
+        const Users = {
+            async loadUsers() {
+                try {
+                    App.showLoading('usersTable');
+                    
+                    const response = await axios.get('/api/users');
+                    const users = response.data;
+                    
+                    this.renderUsers(users);
+                    
+                } catch (error) {
+                    console.error('Error loading users:', error);
+                    App.showError('usersTable', 'Erro ao carregar usuários');
+                }
+            },
+            
+            renderUsers(users) {
+                const container = document.getElementById('usersTable');
+                
+                if (users.length === 0) {
+                    App.showEmpty('usersTable', 'Nenhum usuário encontrado');
+                    return;
+                }
+                
+                const tableHTML = `
+                    <div class="table-responsive">
+                        <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuário</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Função</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criado em</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${users.map(user => `
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${user.id}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${user.name}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${user.email}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${user.username}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${this.getRoleBadgeClass(user.role)}">
+                                                ${user.role}
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${App.formatDate(user.created_at)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                container.innerHTML = tableHTML;
+            },
+            
+            getRoleBadgeClass(role) {
+                const classMap = {
+                    'Administrador': 'bg-red-100 text-red-800',
+                    'Técnico': 'bg-blue-100 text-blue-800',
+                    'Colaborador': 'bg-green-100 text-green-800',
+                    'Diretoria': 'bg-purple-100 text-purple-800'
+                };
+                return classMap[role] || 'bg-gray-100 text-gray-800';
+            }
+        };
+        
+        // Reports module
+        const Reports = {
+            async loadReports() {
+                // Load dashboard stats for reports view
+                Dashboard.loadDashboard();
+            },
+            
+            async exportData() {
+                try {
+                    const params = new URLSearchParams();
+                    
+                    const startDate = document.getElementById('reportStartDate').value;
+                    const endDate = document.getElementById('reportEndDate').value;
+                    const status = document.getElementById('reportStatus').value;
+                    
+                    if (startDate) params.append('start_date', startDate + 'T00:00:00');
+                    if (endDate) params.append('end_date', endDate + 'T23:59:59');
+                    if (status) params.append('status', status);
+                    
+                    const url = `/api/reports/export?${params.toString()}`;
+                    
+                    // Create a temporary link to download the file
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `tickets_report_${new Date().toISOString().split('T')[0]}.csv`;
+                    link.style.display = 'none';
+                    
+                    // Add authorization header
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        // For file downloads, we need to handle differently
+                        window.open(url, '_blank');
+                        App.showNotification('Download iniciado', 'success');
+                    } else {
+                        App.showNotification('Token de autenticação não encontrado', 'error');
+                    }
+                    
+                } catch (error) {
+                    console.error('Error exporting data:', error);
+                    App.showNotification('Erro ao exportar dados', 'error');
+                }
+            },
+            
+            applyFilters() {
+                // Reload dashboard with filters - in a real implementation, this would filter the data
+                this.loadReports();
+                App.showNotification('Filtros aplicados', 'info');
+            }
+        };
+        
+        // Update user info display
+        document.addEventListener('DOMContentLoaded', () => {
+            // Update user name in top bar when user info is loaded
+            const observer = new MutationObserver(() => {
+                const userName = document.getElementById('userName').textContent;
+                const userNameTop = document.getElementById('userNameTop');
+                const userInitial = document.getElementById('userInitial');
+                
+                if (userName && userName !== 'Usuário') {
+                    userNameTop.textContent = userName;
+                    userInitial.textContent = userName.charAt(0).toUpperCase();
+                }
+            });
+            
+            observer.observe(document.getElementById('userName'), { childList: true, characterData: true });
+        });
+    </script>
+</body>
+</html>
