@@ -15,6 +15,10 @@ from sqlalchemy import func, and_, or_
 def index():
     return render_template('index.html')
 
+@app.route('/dashboard')
+def dashboard():
+    return render_template('index.html')
+
 @app.route('/login')
 def login_page():
     return render_template('login.html')

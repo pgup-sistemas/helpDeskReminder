@@ -56,9 +56,11 @@ with app.app_context():
     import auth
     import socketio_events
     
+    # Force recreate all tables to ensure correct schema
+    db.drop_all()
     db.create_all()
     
-    # Create demo users if they don't exist
+    # Create demo users
     from models import User
     from werkzeug.security import generate_password_hash
     
@@ -70,18 +72,16 @@ with app.app_context():
     ]
     
     for user_data in demo_users:
-        existing_user = User.query.filter_by(username=user_data["username"]).first()
-        if not existing_user:
-            user = User(
-                username=user_data["username"],
-                password_hash=generate_password_hash(user_data["password"]),
-                role=user_data["role"],
-                email=user_data["email"],
-                name=user_data["name"]
-            )
-            db.session.add(user)
+        user = User(
+            username=user_data["username"],
+            password_hash=generate_password_hash(user_data["password"]),
+            role=user_data["role"],
+            email=user_data["email"],
+            name=user_data["name"]
+        )
+        db.session.add(user)
     
     db.session.commit()
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True, use_reloader=False, log_output=True)
