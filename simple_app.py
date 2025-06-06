@@ -123,7 +123,25 @@ def dashboard():
 def tickets():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('tickets.html')
+    
+    user_id = session.get('user_id')
+    user_role = session.get('user_role')
+    
+    # Get tickets based on user role
+    if user_role == 'Colaborador':
+        tickets_list = Ticket.query.filter_by(creator_id=user_id).order_by(Ticket.created_at.desc()).all()
+    else:
+        tickets_list = Ticket.query.order_by(Ticket.created_at.desc()).all()
+    
+    # Enhance tickets with creator and assignee info
+    for ticket in tickets_list:
+        ticket.creator = User.query.get(ticket.creator_id)
+        if ticket.assigned_to:
+            ticket.assignee = User.query.get(ticket.assigned_to)
+        else:
+            ticket.assignee = None
+    
+    return render_template('simple_tickets.html', tickets=tickets_list)
 
 @app.route('/users')
 def users():
@@ -131,7 +149,9 @@ def users():
         return redirect(url_for('login'))
     if session.get('user_role') not in ['Administrador', 'Diretoria']:
         return redirect(url_for('index'))
-    return render_template('users.html')
+    
+    users_list = User.query.filter_by(active=True).order_by(User.created_at.desc()).all()
+    return render_template('simple_users.html', users=users_list)
 
 @app.route('/reports')
 def reports():
@@ -139,7 +159,53 @@ def reports():
         return redirect(url_for('login'))
     if session.get('user_role') not in ['Administrador', 'Diretoria']:
         return redirect(url_for('index'))
-    return render_template('reports.html')
+    
+    # Calculate report statistics
+    total_tickets = Ticket.query.count()
+    open_tickets = Ticket.query.filter(Ticket.status.in_(['Aberto', 'Em Andamento'])).count()
+    resolved_tickets = Ticket.query.filter_by(status='Resolvido').count()
+    closed_tickets = Ticket.query.filter_by(status='Fechado').count()
+    
+    resolution_rate = round((resolved_tickets + closed_tickets) / total_tickets * 100, 1) if total_tickets > 0 else 0
+    
+    # Priority breakdown
+    priority_breakdown = [
+        {'priority': 'Alta', 'count': Ticket.query.filter_by(priority='Alta').count()},
+        {'priority': 'Média', 'count': Ticket.query.filter_by(priority='Média').count()},
+        {'priority': 'Baixa', 'count': Ticket.query.filter_by(priority='Baixa').count()}
+    ]
+    
+    # Status breakdown
+    status_breakdown = [
+        {'status': 'Aberto', 'count': Ticket.query.filter_by(status='Aberto').count()},
+        {'status': 'Em Andamento', 'count': Ticket.query.filter_by(status='Em Andamento').count()},
+        {'status': 'Resolvido', 'count': resolved_tickets},
+        {'status': 'Fechado', 'count': closed_tickets}
+    ]
+    
+    # Department breakdown
+    departments = ['TI', 'RH', 'Financeiro', 'Vendas', 'Marketing', 'Operações', 'Suporte']
+    department_breakdown = []
+    for dept in departments:
+        count = Ticket.query.filter_by(department=dept).count()
+        if count > 0:
+            department_breakdown.append({'department': dept, 'count': count})
+    
+    stats = {
+        'total_tickets': total_tickets,
+        'open_tickets': open_tickets,
+        'resolved_tickets': resolved_tickets,
+        'closed_tickets': closed_tickets,
+        'resolution_rate': resolution_rate,
+        'avg_resolution_time': 24,  # Mock data for average resolution time
+        'priority_breakdown': priority_breakdown,
+        'status_breakdown': status_breakdown,
+        'department_breakdown': department_breakdown,
+        'sla_compliance': 85,  # Mock SLA compliance percentage
+        'sla_violations': 0    # Mock SLA violations count
+    }
+    
+    return render_template('simple_reports.html', stats=stats)
 
 # API Routes
 @app.route('/api/dashboard/stats')
