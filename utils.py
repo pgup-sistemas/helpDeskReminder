@@ -95,6 +95,20 @@ def get_dashboard_stats():
         Ticket.created_at <= today_end
     ).count()
 
+    return {
+        'total_tickets': total_tickets,
+        'open_tickets': open_tickets,
+        'in_progress_tickets': in_progress_tickets,
+        'resolved_tickets': resolved_tickets,
+        'closed_tickets': closed_tickets,
+        'sla_violated': sla_violated,
+        'high_priority': high_priority,
+        'medium_priority': medium_priority,
+        'low_priority': low_priority,
+        'critical_tickets': critical_tickets,
+        'tickets_today': tickets_today
+    }
+
     # Tickets this week
     week_start = datetime.utcnow() - timedelta(days=7)
     tickets_this_week = Ticket.query.filter(Ticket.created_at >= week_start).count()

@@ -3,7 +3,7 @@ import os
 import logging
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import JWTManager
+# JWT removed - using Flask-Login only
 from flask_socketio import SocketIO
 from flask_cors import CORS
 from flask_login import LoginManager
@@ -17,7 +17,6 @@ class Base(DeclarativeBase):
     pass
 
 db = SQLAlchemy(model_class=Base)
-jwt = JWTManager()
 socketio = SocketIO(cors_allowed_origins="*")
 login_manager = LoginManager()
 
@@ -29,9 +28,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 # Configure CORS
 CORS(app)
 
-# Configure JWT
-app.config['JWT_SECRET_KEY'] = os.environ.get("JWT_SECRET_KEY", "jwt-secret-string")
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False
+# JWT configuration removed - using Flask-Login only
 
 # Configure Flask-Login
 login_manager.init_app(app)
@@ -56,7 +53,6 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Initialize extensions
 db.init_app(app)
-jwt.init_app(app)
 socketio.init_app(app)
 
 @login_manager.user_loader
@@ -64,18 +60,7 @@ def load_user(user_id):
     from models import User
     return User.query.get(int(user_id))
 
-# JWT error handlers
-@jwt.expired_token_loader
-def expired_token_callback(jwt_header, jwt_payload):
-    return jsonify({'message': 'Token has expired'}), 401
-
-@jwt.invalid_token_loader
-def invalid_token_callback(error):
-    return jsonify({'message': 'Invalid token'}), 401
-
-@jwt.unauthorized_loader
-def missing_token_callback(error):
-    return jsonify({'message': 'Authorization token is required'}), 401
+# Using Flask-Login for session management
 
 # Import routes and socket handlers
 from routes import *

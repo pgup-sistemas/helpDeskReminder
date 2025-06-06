@@ -17,7 +17,7 @@ from utils import allowed_file, get_dashboard_stats
 def index():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
-    return render_template('login.html')
+    return redirect(url_for('login_page'))
 
 @app.route('/login')
 def login_page():
