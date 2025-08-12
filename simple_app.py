@@ -7,6 +7,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from sqlalchemy import event
+import traceback
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -22,12 +23,24 @@ app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-prod
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure database
-database_url = os.environ.get("DATABASE_URL", "sqlite:///helpdesk.db")
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
+database_url = os.environ.get("DATABASE_URL")
+if database_url:
+    # PostgreSQL configuration
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+        "pool_timeout": 20,
+        "pool_size": 5,
+        "max_overflow": 10
+    }
+else:
+    # SQLite fallback configuration
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///helpdesk.db"
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+    }
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Initialize extensions
@@ -330,30 +343,41 @@ def create_ticket():
     
     return jsonify({'message': 'Ticket created successfully', 'ticket_id': ticket.id}), 201
 
-with app.app_context():
-    # Drop and recreate all tables
-    db.drop_all()
-    db.create_all()
-    
-    # Create demo users
-    demo_users = [
-        {"username": "admin", "password": "admin123", "role": "Administrador", "email": "admin@company.com", "name": "Administrador Sistema"},
-        {"username": "tecnico1", "password": "tecnico123", "role": "Técnico", "email": "tecnico1@company.com", "name": "João Silva"},
-        {"username": "colaborador1", "password": "colab123", "role": "Colaborador", "email": "colaborador1@company.com", "name": "Maria Santos"},
-        {"username": "diretor", "password": "diretor123", "role": "Diretoria", "email": "diretor@company.com", "name": "Carlos Diretor"}
-    ]
-    
-    for user_data in demo_users:
-        user = User(
-            username=user_data["username"],
-            password_hash=generate_password_hash(user_data["password"]),
-            role=user_data["role"],
-            email=user_data["email"],
-            name=user_data["name"]
-        )
-        db.session.add(user)
-    
-    db.session.commit()
+def init_database():
+    """Initialize database with tables and demo data"""
+    try:
+        with app.app_context():
+            # Create all tables
+            db.create_all()
+            
+            # Check if admin user already exists
+            admin_exists = User.query.filter_by(username='admin').first()
+            if not admin_exists:
+                # Create demo users only if they don't exist
+                demo_users = [
+                    {"username": "admin", "password": "admin123", "role": "Administrador", "email": "admin@company.com", "name": "Administrador Sistema"},
+                    {"username": "tecnico1", "password": "tecnico123", "role": "Técnico", "email": "tecnico1@company.com", "name": "João Silva"},
+                    {"username": "colaborador1", "password": "colab123", "role": "Colaborador", "email": "colaborador1@company.com", "name": "Maria Santos"},
+                    {"username": "diretor", "password": "diretor123", "role": "Diretoria", "email": "diretor@company.com", "name": "Carlos Diretor"}
+                ]
+                
+                for user_data in demo_users:
+                    user = User(
+                        username=user_data["username"],
+                        password_hash=generate_password_hash(user_data["password"]),
+                        role=user_data["role"],
+                        email=user_data["email"],
+                        name=user_data["name"]
+                    )
+                    db.session.add(user)
+                
+                db.session.commit()
+                print("Database initialized with demo users")
+            else:
+                print("Database already initialized")
+    except Exception as e:
+        print(f"Database initialization error: {e}")
+        # Don't crash the app if database fails
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
