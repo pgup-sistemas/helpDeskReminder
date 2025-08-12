@@ -1,6 +1,8 @@
-from flask_socketio import emit, join_room, leave_room, rooms, request
+from flask_socketio import emit, join_room, leave_room, rooms
+from flask import request
 from flask_jwt_extended import decode_token
-from app import socketio, db
+from app import socketio
+from database import db
 from models import User, Ticket, Message
 import logging
 

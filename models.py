@@ -1,4 +1,4 @@
-from app import db
+from database import db
 from datetime import datetime, timedelta
 from sqlalchemy import event
 

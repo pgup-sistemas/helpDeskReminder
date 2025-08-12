@@ -400,7 +400,8 @@ def create_ticket():
         department=data['department'],
         priority=data['priority'],
         observations=data.get('observations', ''),
-        creator_id=user_id
+        creator_id=user_id,
+        created_at=datetime.utcnow()
     )
     
     # Calculate SLA

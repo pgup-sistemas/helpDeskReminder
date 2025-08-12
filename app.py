@@ -1,20 +1,15 @@
 import os
 import logging
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
 from flask_cors import CORS
+from database import db
+from simple_app import app as simple_app, User as SimpleUser, Ticket as SimpleTicket
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
-
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
 
 # Create the app
 app = Flask(__name__)
@@ -51,7 +46,7 @@ os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 with app.app_context():
     # Import models to ensure tables are created
-    import models
+    from models import User, Ticket, Message, Attachment
     import routes
     import auth
     import socketio_events

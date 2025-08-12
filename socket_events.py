@@ -2,6 +2,7 @@ from flask_socketio import emit, join_room, leave_room
 from flask import session
 from app import socketio
 from models import User, Ticket
+from database import db
 
 @socketio.on('connect')
 def on_connect():

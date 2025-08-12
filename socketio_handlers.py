@@ -1,7 +1,8 @@
 from flask_socketio import emit, join_room, leave_room
 from flask_jwt_extended import decode_token
 from app import socketio
-from models import User, Ticket
+from models import User, Ticket, Message as ChatMessage
+from database import db
 from auth import can_access_ticket
 
 @socketio.on('connect')
@@ -142,7 +143,6 @@ def handle_send_message(data):
             return
         
         # Create and save message
-        from models import ChatMessage, db
         message = ChatMessage(
             content=content,
             ticket_id=ticket_id,
@@ -161,7 +161,8 @@ def handle_send_message(data):
 from flask_socketio import emit, join_room, leave_room
 from flask_login import current_user
 from app import socketio
-from models import Ticket, ChatMessage, db
+from models import Ticket, Message as ChatMessage
+from database import db
 from auth import can_access_ticket
 
 @socketio.on('connect')

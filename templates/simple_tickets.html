@@ -98,7 +98,7 @@
             <div id="createForm" class="hidden mb-8">
                 <div class="bg-white shadow rounded-lg p-6">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Criar Novo Chamado</h3>
-                    <form action="/api/tickets" method="POST">
+                    <form id="createTicketForm" onsubmit="submitTicketForm(event)">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div class="md:col-span-2">
                                 <label for="title" class="block text-sm font-medium text-gray-700 mb-1">Título *</label>
@@ -247,33 +247,43 @@
         function hideCreateForm() {
             document.getElementById('createForm').classList.add('hidden');
         }
-
-        // Handle form submission
-        document.querySelector('form').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        
+        async function submitTicketForm(event) {
+            event.preventDefault();
             
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData);
+            const form = document.getElementById('createTicketForm');
+            const formData = new FormData(form);
+            
+            const ticketData = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                department: formData.get('department'),
+                priority: formData.get('priority'),
+                observations: formData.get('observations') || ''
+            };
             
             try {
                 const response = await fetch('/api/tickets', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(ticketData)
                 });
                 
-                if (response.ok) {
-                    window.location.reload();
-                } else {
-                    const error = await response.json();
-                    alert('Erro ao criar chamado: ' + (error.error || 'Erro desconhecido'));
+                if (!response.ok) {
+                    throw new Error('Erro ao criar chamado');
                 }
+                
+                const data = await response.json();
+                alert('Chamado criado com sucesso!');
+                form.reset();
+                window.location.reload();
             } catch (error) {
+                console.error('Erro ao criar chamado:', error);
                 alert('Erro ao criar chamado: ' + error.message);
             }
-        });
+        }
     </script>
 </body>
 </html>

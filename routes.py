@@ -2,7 +2,8 @@ from flask import request, jsonify, render_template, send_file, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
-from app import app, db
+from app import app
+from database import db
 from models import User, Ticket, Message, Attachment
 from datetime import datetime, timedelta
 import os
@@ -13,7 +14,7 @@ from sqlalchemy import func, and_, or_
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('login.html')
 
 @app.route('/dashboard')
 def dashboard():

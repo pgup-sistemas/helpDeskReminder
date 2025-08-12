@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from models import Ticket
+from database import db
 import os
 
 def get_sla_hours(priority):
