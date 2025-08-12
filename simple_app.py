@@ -22,25 +22,49 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure database
-database_url = os.environ.get("DATABASE_URL")
-if database_url:
-    # PostgreSQL configuration
-    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_recycle": 300,
-        "pool_pre_ping": True,
-        "pool_timeout": 20,
-        "pool_size": 5,
-        "max_overflow": 10
-    }
-else:
+# Configure database with fallback
+def configure_database():
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        try:
+            # Test PostgreSQL connection
+            import psycopg2
+            # Extract connection parameters for testing
+            from urllib.parse import urlparse
+            parsed = urlparse(database_url)
+            test_conn = psycopg2.connect(
+                host=parsed.hostname,
+                port=parsed.port,
+                database=parsed.path[1:],
+                user=parsed.username,
+                password=parsed.password
+            )
+            test_conn.close()
+            
+            # PostgreSQL configuration
+            app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+                "pool_recycle": 300,
+                "pool_pre_ping": True,
+                "pool_timeout": 20,
+                "pool_size": 5,
+                "max_overflow": 10
+            }
+            print("Using PostgreSQL database")
+            return "postgresql"
+        except Exception as e:
+            print(f"PostgreSQL connection failed: {e}")
+            print("Falling back to SQLite")
+    
     # SQLite fallback configuration
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///helpdesk.db"
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "pool_pre_ping": True,
     }
+    print("Using SQLite database")
+    return "sqlite"
 
+db_type = configure_database()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Initialize extensions
@@ -80,24 +104,31 @@ def index():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
-    # Get dashboard stats
-    stats = {
-        'total_tickets': Ticket.query.count(),
-        'open_tickets': Ticket.query.filter(Ticket.status.in_(['Aberto', 'Em Andamento'])).count(),
-        'resolved_tickets': Ticket.query.filter_by(status='Resolvido').count(),
-        'closed_tickets': Ticket.query.filter_by(status='Fechado').count()
-    }
-    
-    # Get recent tickets for current user
-    user_role = session.get('user_role')
-    user_id = session.get('user_id')
-    
-    if user_role == 'Colaborador':
-        recent_tickets = Ticket.query.filter_by(creator_id=user_id).order_by(Ticket.created_at.desc()).limit(5).all()
-    else:
-        recent_tickets = Ticket.query.order_by(Ticket.created_at.desc()).limit(5).all()
-    
-    return render_template('simple_dashboard.html', stats=stats, recent_tickets=recent_tickets)
+    try:
+        # Get dashboard stats
+        stats = {
+            'total_tickets': Ticket.query.count(),
+            'open_tickets': Ticket.query.filter(Ticket.status.in_(['Aberto', 'Em Andamento'])).count(),
+            'resolved_tickets': Ticket.query.filter_by(status='Resolvido').count(),
+            'closed_tickets': Ticket.query.filter_by(status='Fechado').count()
+        }
+        
+        # Get recent tickets for current user
+        user_role = session.get('user_role')
+        user_id = session.get('user_id')
+        
+        if user_role == 'Colaborador':
+            recent_tickets = Ticket.query.filter_by(creator_id=user_id).order_by(Ticket.created_at.desc()).limit(5).all()
+        else:
+            recent_tickets = Ticket.query.order_by(Ticket.created_at.desc()).limit(5).all()
+        
+        return render_template('simple_dashboard.html', stats=stats, recent_tickets=recent_tickets)
+    except Exception as e:
+        print(f"Database error in dashboard: {e}")
+        # Return dashboard with default values if database fails
+        stats = {'total_tickets': 0, 'open_tickets': 0, 'resolved_tickets': 0, 'closed_tickets': 0}
+        recent_tickets = []
+        return render_template('simple_dashboard.html', stats=stats, recent_tickets=recent_tickets, error="Erro de conexão com banco de dados")
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -108,16 +139,21 @@ def login():
         if not username or not password:
             return render_template('simple_login.html', error='Por favor, preencha todos os campos.')
         
-        user = User.query.filter_by(username=username, active=True).first()
-        
-        if user and check_password_hash(user.password_hash, password):
-            session['user_id'] = user.id
-            session['user_name'] = user.name
-            session['user_role'] = user.role
-            session['username'] = user.username
-            return redirect(url_for('index'))
-        else:
-            return render_template('simple_login.html', error='Credenciais inválidas.')
+        try:
+            user = User.query.filter_by(username=username, active=True).first()
+            
+            if user and check_password_hash(user.password_hash, password):
+                session['user_id'] = user.id
+                session['user_name'] = user.name
+                session['user_role'] = user.role
+                session['username'] = user.username
+                return redirect(url_for('index'))
+            else:
+                return render_template('simple_login.html', error='Credenciais inválidas.')
+        except Exception as e:
+            # Database connection error
+            print(f"Database error during login: {e}")
+            return render_template('simple_login.html', error='Erro de conexão com banco de dados. Tente novamente.')
     
     return render_template('simple_login.html')
 
@@ -345,39 +381,62 @@ def create_ticket():
 
 def init_database():
     """Initialize database with tables and demo data"""
-    try:
-        with app.app_context():
-            # Create all tables
-            db.create_all()
-            
-            # Check if admin user already exists
-            admin_exists = User.query.filter_by(username='admin').first()
-            if not admin_exists:
-                # Create demo users only if they don't exist
-                demo_users = [
-                    {"username": "admin", "password": "admin123", "role": "Administrador", "email": "admin@company.com", "name": "Administrador Sistema"},
-                    {"username": "tecnico1", "password": "tecnico123", "role": "Técnico", "email": "tecnico1@company.com", "name": "João Silva"},
-                    {"username": "colaborador1", "password": "colab123", "role": "Colaborador", "email": "colaborador1@company.com", "name": "Maria Santos"},
-                    {"username": "diretor", "password": "diretor123", "role": "Diretoria", "email": "diretor@company.com", "name": "Carlos Diretor"}
-                ]
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            with app.app_context():
+                # Test database connection first
+                db.engine.execute(db.text("SELECT 1"))
                 
-                for user_data in demo_users:
-                    user = User(
-                        username=user_data["username"],
-                        password_hash=generate_password_hash(user_data["password"]),
-                        role=user_data["role"],
-                        email=user_data["email"],
-                        name=user_data["name"]
-                    )
-                    db.session.add(user)
+                # Create all tables
+                db.create_all()
                 
-                db.session.commit()
-                print("Database initialized with demo users")
+                # Check if admin user already exists
+                admin_exists = User.query.filter_by(username='admin').first()
+                if not admin_exists:
+                    # Create demo users only if they don't exist
+                    demo_users = [
+                        {"username": "admin", "password": "admin123", "role": "Administrador", "email": "admin@company.com", "name": "Administrador Sistema"},
+                        {"username": "tecnico1", "password": "tecnico123", "role": "Técnico", "email": "tecnico1@company.com", "name": "João Silva"},
+                        {"username": "colaborador1", "password": "colab123", "role": "Colaborador", "email": "colaborador1@company.com", "name": "Maria Santos"},
+                        {"username": "diretor", "password": "diretor123", "role": "Diretoria", "email": "diretor@company.com", "name": "Carlos Diretor"}
+                    ]
+                    
+                    for user_data in demo_users:
+                        user = User(
+                            username=user_data["username"],
+                            password_hash=generate_password_hash(user_data["password"]),
+                            role=user_data["role"],
+                            email=user_data["email"],
+                            name=user_data["name"]
+                        )
+                        db.session.add(user)
+                    
+                    db.session.commit()
+                    print("Database initialized with demo users")
+                else:
+                    print("Database already initialized")
+                break  # Success, exit retry loop
+                
+        except Exception as e:
+            print(f"Database initialization error (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                print(f"Retrying in {retry_delay} seconds...")
+                import time
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
             else:
-                print("Database already initialized")
-    except Exception as e:
-        print(f"Database initialization error: {e}")
-        # Don't crash the app if database fails
+                print("Database initialization failed after all retries. App will continue with limited functionality.")
+                # Force SQLite as fallback
+                app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///helpdesk_emergency.db"
+                try:
+                    with app.app_context():
+                        db.create_all()
+                        print("Emergency SQLite database created")
+                except Exception as emergency_error:
+                    print(f"Emergency database creation failed: {emergency_error}")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
