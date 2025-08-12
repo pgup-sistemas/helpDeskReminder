@@ -140,6 +140,12 @@ def login():
             return render_template('simple_login.html', error='Por favor, preencha todos os campos.')
         
         try:
+            # Initialize database if needed
+            try:
+                db.create_all()
+            except:
+                pass
+            
             user = User.query.filter_by(username=username, active=True).first()
             
             if user and check_password_hash(user.password_hash, password):
@@ -151,9 +157,40 @@ def login():
             else:
                 return render_template('simple_login.html', error='Credenciais inválidas.')
         except Exception as e:
-            # Database connection error
+            # Database connection error - try to initialize with emergency data
             print(f"Database error during login: {e}")
-            return render_template('simple_login.html', error='Erro de conexão com banco de dados. Tente novamente.')
+            try:
+                # Try to create tables and demo user
+                db.create_all()
+                
+                # Check if we need to create demo users
+                from werkzeug.security import generate_password_hash
+                if not User.query.first():
+                    admin_user = User(
+                        username='admin',
+                        password_hash=generate_password_hash('admin123'),
+                        role='Administrador',
+                        email='admin@company.com',
+                        name='Administrador Sistema'
+                    )
+                    db.session.add(admin_user)
+                    db.session.commit()
+                    print("Emergency admin user created")
+                
+                # Try login again
+                user = User.query.filter_by(username=username, active=True).first()
+                if user and check_password_hash(user.password_hash, password):
+                    session['user_id'] = user.id
+                    session['user_name'] = user.name
+                    session['user_role'] = user.role
+                    session['username'] = user.username
+                    return redirect(url_for('index'))
+                else:
+                    return render_template('simple_login.html', error='Credenciais inválidas.')
+                    
+            except Exception as init_error:
+                print(f"Emergency initialization failed: {init_error}")
+                return render_template('simple_login.html', error='Erro de conexão com banco de dados. Tente novamente.')
     
     return render_template('simple_login.html')
 
@@ -388,7 +425,8 @@ def init_database():
         try:
             with app.app_context():
                 # Test database connection first
-                db.engine.execute(db.text("SELECT 1"))
+                with db.engine.connect() as connection:
+                    connection.execute(db.text("SELECT 1"))
                 
                 # Create all tables
                 db.create_all()
